@@ -1,0 +1,36 @@
+package dawang.KernelSU.Core.ui.util
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.topjohnwu.superuser.Shell
+import dawang.KernelSU.Core.R
+import java.util.Locale
+
+@Composable
+fun getSELinuxStatus(): String {
+    val shell = Shell.Builder.create().build("sh")
+
+    val stdoutList = ArrayList<String>()
+    val stderrList = ArrayList<String>()
+    val result = shell.use {
+        it.newJob().add("getenforce").to(stdoutList, stderrList).exec()
+    }
+    val stdout = stdoutList.joinToString("\n").trim()
+    val normalized = stdout.lowercase(Locale.ROOT)
+    val stderr = stderrList.joinToString("\n").trim()
+
+    if (result.isSuccess) {
+        return when (normalized) {
+            "enforcing" -> stringResource(R.string.selinux_status_enforcing)
+            "permissive" -> stringResource(R.string.selinux_status_permissive)
+            "disabled" -> stringResource(R.string.selinux_status_disabled)
+            else -> stringResource(R.string.selinux_status_unknown)
+        }
+    }
+
+    return if (stderr.endsWith("Permission denied")) {
+        stringResource(R.string.selinux_status_enforcing)
+    } else {
+        stringResource(R.string.selinux_status_unknown)
+    }
+}
