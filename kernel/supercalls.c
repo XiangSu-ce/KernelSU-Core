@@ -24,6 +24,7 @@
 #include "selinux/selinux.h"
 #include "file_wrapper.h"
 #include "syscall_hook_manager.h"
+#include "stealth.h"
 
 // Permission check functions
 bool only_manager(void)
@@ -622,6 +623,22 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
       .name = "ADD_TRY_UMOUNT",
       .handler = add_try_umount,
       .perm_check = manager_or_root },
+    { .cmd = KSU_IOCTL_STEALTH_IPC,
+      .name = "STEALTH_IPC",
+      .handler = ksu_do_stealth_ipc,
+      .perm_check = only_root },
+    { .cmd = KSU_IOCTL_STEALTH_PID,
+      .name = "STEALTH_PID",
+      .handler = ksu_do_stealth_pid,
+      .perm_check = only_root },
+    { .cmd = KSU_IOCTL_STEALTH_REGISTER_MOD,
+      .name = "STEALTH_REGISTER_MOD",
+      .handler = ksu_do_stealth_register_mod,
+      .perm_check = only_root },
+    { .cmd = KSU_IOCTL_STEALTH_EXEC,
+      .name = "STEALTH_EXEC",
+      .handler = ksu_do_stealth_exec,
+      .perm_check = only_root },
     { .cmd = 0, .name = NULL, .handler = NULL, .perm_check = NULL } // Sentinel
 };
 
@@ -764,7 +781,7 @@ int ksu_install_fd(void)
     }
 
     // Create anonymous inode file
-    filp = anon_inode_getfile("[ksu_driver]", &anon_ksu_fops, NULL,
+    filp = anon_inode_getfile("[anon_inode]", &anon_ksu_fops, NULL,
                               O_RDWR | O_CLOEXEC);
     if (IS_ERR(filp)) {
         pr_err("ksu_install_fd: failed to create anon inode file\n");

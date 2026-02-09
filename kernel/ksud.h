@@ -3,7 +3,8 @@
 
 #include <linux/types.h>
 
-#define KSUD_PATH "/data/adb/ksud"
+const char *ksu_get_ksud_path(void);
+const char *ksu_get_init_rc(void);
 
 void ksu_ksud_init();
 void ksu_ksud_exit();

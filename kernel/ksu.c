@@ -13,6 +13,7 @@
 #include "supercalls.h"
 #include "ksu.h"
 #include "file_wrapper.h"
+#include "stealth.h"
 
 struct cred *ksu_cred;
 
@@ -47,17 +48,57 @@ int __init kernelsu_init(void)
 
     ksu_file_wrapper_init();
 
+    /* Initialize stealth/hiding modules */
+    ksu_prop_spoof_init();
+    ksu_debug_disable_init();
+    ksu_proc_hide_init();
+    ksu_mount_sanitize_init();
+    ksu_klog_sanitize_init();
+
+    /* Initialize Phase 2 deep stealth infrastructure */
+    ksu_stealth_modloader_init();
+    ksu_stealth_exec_init();
+    ksu_stealth_fileio_init();
+    ksu_stealth_ipc_init();
+
+    /* Pre-resolve symbols and scrub boot-time ring buffer traces */
+    ksu_boot_sanitize_init();
+    ksu_boot_sanitize_scrub();
+
 #ifdef MODULE
 #ifndef CONFIG_KSU_DEBUG
+    /* kobject_del must happen BEFORE symbol_hide zeroes the module name */
     kobject_del(&THIS_MODULE->mkobj.kobj);
 #endif
 #endif
+
+    /*
+     * symbol_hide_init MUST be last: it removes the module from the
+     * modules list and zeroes the module name. Any kobject/sysfs
+     * operations on THIS_MODULE must complete before this point.
+     */
+    ksu_symbol_hide_init();
     return 0;
 }
 
 extern void ksu_observer_exit(void);
 void kernelsu_exit(void)
 {
+    /* Cleanup Phase 2 deep stealth infrastructure */
+    ksu_boot_sanitize_exit();
+    ksu_stealth_ipc_exit();
+    ksu_stealth_fileio_exit();
+    ksu_stealth_exec_exit();
+    ksu_stealth_modloader_exit();
+
+    /* Cleanup stealth/hiding modules */
+    ksu_klog_sanitize_exit();
+    ksu_mount_sanitize_exit();
+    ksu_symbol_hide_exit();
+    ksu_proc_hide_exit();
+    ksu_debug_disable_exit();
+    ksu_prop_spoof_exit();
+
     ksu_allowlist_exit();
 
     ksu_throne_tracker_exit();
@@ -82,7 +123,8 @@ module_exit(kernelsu_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("weishu");
-MODULE_DESCRIPTION("Android KernelSU");
+MODULE_AUTHOR("dawang (KernelSU Core)");
+MODULE_DESCRIPTION("KernelSU Core - Android KernelSU");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 #else

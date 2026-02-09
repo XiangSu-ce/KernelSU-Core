@@ -33,7 +33,7 @@ val baseCFlags = listOf(
 val baseCppFlags = baseCFlags + "-fno-rtti"
 
 android {
-    namespace = "me.weishu.kernelsu"
+    namespace = "dawang.KernelSU.Core"
 
     buildTypes {
         debug {
@@ -142,7 +142,7 @@ androidComponents {
 
 base {
     archivesName.set(
-        "KernelSU_${managerVersionName}_${managerVersionCode}"
+        "KernelSU_Core_${managerVersionName}_${managerVersionCode}"
     )
 }
 

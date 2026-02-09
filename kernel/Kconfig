@@ -17,4 +17,14 @@ config KSU_DEBUG
 	help
 	  Enable KernelSU debug mode.
 
+config KSU_SILENT
+	bool "KernelSU silent mode (suppress all log output)"
+	depends on KSU
+	default n
+	help
+	  Suppress all KernelSU log output at compile time.
+	  When enabled, pr_info/pr_warn/pr_notice/pr_debug become
+	  no-ops. Only pr_err and pr_alert are preserved for
+	  critical errors. This prevents KSU detection via dmesg.
+
 endmenu

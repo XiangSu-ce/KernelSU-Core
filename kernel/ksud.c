@@ -17,6 +17,7 @@
 #include <linux/namei.h>
 #include <linux/workqueue.h>
 #include <linux/uio.h>
+#include <linux/atomic.h>
 
 #include "manager.h"
 #include "allowlist.h"
@@ -26,33 +27,60 @@
 #include "util.h"
 #include "selinux/selinux.h"
 #include "throne_tracker.h"
+#include "obfuscate.h"
 
 bool ksu_module_mounted __read_mostly = false;
 bool ksu_boot_completed __read_mostly = false;
 
-static const char KERNEL_SU_RC[] =
-    "\n"
+DEFINE_OBF_RUNTIME(ksud_path, "/data/adb/.svc/core");
 
-    "on post-fs-data\n"
-    "    start logd\n"
-    // We should wait for the post-fs-data finish
-    "    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH " post-fs-data\n"
-    "\n"
+static const char *ksu_get_obf_path(void)
+{
+	static atomic_t ready = ATOMIC_INIT(0);
+	static const char *decoded;
 
-    "on nonencrypted\n"
-    "    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH " services\n"
-    "\n"
+	if (!atomic_read(&ready))
+		OBF_INIT_RUNTIME(ksud_path);
+	decoded = OBF_GET(ksud_path);
+	atomic_set(&ready, 1);
+	return decoded;
+}
 
-    "on property:vold.decrypt=trigger_restart_framework\n"
-    "    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH " services\n"
-    "\n"
+const char *ksu_get_ksud_path(void)
+{
+	return ksu_get_obf_path();
+}
 
-    "on property:sys.boot_completed=1\n"
-    "    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH
-    " boot-completed\n"
-    "\n"
+const char *ksu_get_init_rc(void)
+{
+	static char rc[512];
+	static atomic_t built = ATOMIC_INIT(0);
 
-    "\n";
+	if (!atomic_read(&built)) {
+		const char *path = ksu_get_obf_path();
+		snprintf(rc, sizeof(rc),
+			 "\n"
+			 "on post-fs-data\n"
+			 "    start logd\n"
+			 "    exec u:r:%s:s0 root -- %s post-fs-data\n"
+			 "\n"
+			 "on nonencrypted\n"
+			 "    exec u:r:%s:s0 root -- %s services\n"
+			 "\n"
+			 "on property:vold.decrypt=trigger_restart_framework\n"
+			 "    exec u:r:%s:s0 root -- %s services\n"
+			 "\n"
+			 "on property:sys.boot_completed=1\n"
+			 "    exec u:r:%s:s0 root -- %s boot-completed\n"
+			 "\n",
+			 KERNEL_SU_DOMAIN, path,
+			 KERNEL_SU_DOMAIN, path,
+			 KERNEL_SU_DOMAIN, path,
+			 KERNEL_SU_DOMAIN, path);
+		atomic_set(&built, 1);
+	}
+	return rc;
+}
 
 static void stop_init_rc_hook();
 static void stop_execve_hook();
@@ -278,7 +306,8 @@ static ssize_t (*orig_read)(struct file *, char __user *, size_t, loff_t *);
 static ssize_t (*orig_read_iter)(struct kiocb *, struct iov_iter *);
 static struct file_operations fops_proxy;
 static ssize_t ksu_rc_pos = 0;
-const size_t ksu_rc_len = sizeof(KERNEL_SU_RC) - 1;
+static const char *ksu_rc_str;
+static size_t ksu_rc_len;
 
 // https://cs.android.com/android/platform/superproject/main/+/main:system/core/init/parser.cpp;l=144;drc=61197364367c9e404c7da6900658f1b16c42d0da
 // https://cs.android.com/android/platform/superproject/main/+/main:system/libbase/file.cpp;l=241-243;drc=61197364367c9e404c7da6900658f1b16c42d0da
@@ -290,6 +319,10 @@ static ssize_t read_proxy(struct file *file, char __user *buf, size_t count,
 {
     ssize_t ret = 0;
     size_t append_count;
+    if (!ksu_rc_str) {
+        ksu_rc_str = ksu_get_init_rc();
+        ksu_rc_len = strlen(ksu_rc_str);
+    }
     if (ksu_rc_pos && ksu_rc_pos < ksu_rc_len)
         goto append_ksu_rc;
 
@@ -304,7 +337,7 @@ append_ksu_rc:
     if (append_count > count - ret)
         append_count = count - ret;
     // copy_to_user returns the number of not copied
-    if (copy_to_user(buf + ret, KERNEL_SU_RC + ksu_rc_pos, append_count)) {
+    if (copy_to_user(buf + ret, ksu_rc_str + ksu_rc_pos, append_count)) {
         pr_info("read_proxy: append error, totally appended %ld\n", ksu_rc_pos);
     } else {
         pr_info("read_proxy: append %ld\n", append_count);
@@ -323,6 +356,10 @@ static ssize_t read_iter_proxy(struct kiocb *iocb, struct iov_iter *to)
 {
     ssize_t ret = 0;
     size_t append_count;
+    if (!ksu_rc_str) {
+        ksu_rc_str = ksu_get_init_rc();
+        ksu_rc_len = strlen(ksu_rc_str);
+    }
     if (ksu_rc_pos && ksu_rc_pos < ksu_rc_len)
         goto append_ksu_rc;
 
@@ -335,7 +372,7 @@ static ssize_t read_iter_proxy(struct kiocb *iocb, struct iov_iter *to)
 append_ksu_rc:
     // copy_to_iter returns the number of copied bytes
     append_count =
-        copy_to_iter(KERNEL_SU_RC + ksu_rc_pos, ksu_rc_len - ksu_rc_pos, to);
+        copy_to_iter(ksu_rc_str + ksu_rc_pos, ksu_rc_len - ksu_rc_pos, to);
     if (!append_count) {
         pr_info("read_iter_proxy: append error, totally appended %ld\n",
                 ksu_rc_pos);

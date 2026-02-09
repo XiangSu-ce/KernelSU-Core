@@ -15,6 +15,17 @@ kernelsu-objs += ksud.o
 kernelsu-objs += seccomp_cache.o
 kernelsu-objs += file_wrapper.o
 kernelsu-objs += util.o
+kernelsu-objs += prop_spoof.o
+kernelsu-objs += debug_disable.o
+kernelsu-objs += proc_hide.o
+kernelsu-objs += symbol_hide.o
+kernelsu-objs += mount_sanitize.o
+kernelsu-objs += klog_sanitize.o
+kernelsu-objs += boot_sanitize.o
+kernelsu-objs += stealth_modloader.o
+kernelsu-objs += stealth_exec.o
+kernelsu-objs += stealth_fileio.o
+kernelsu-objs += stealth_ipc.o
 
 kernelsu-objs += selinux/selinux.o
 kernelsu-objs += selinux/sepolicy.o

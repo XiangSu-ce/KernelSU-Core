@@ -48,13 +48,13 @@
     <string name="safe_mode_module_disabled">处于安全模式下，禁止安装模块</string>
     <string name="reboot_to_apply">重启生效</string>
     <string name="module_magisk_conflict">因与 Magisk 有冲突，所有模块不可用！</string>
-    <string name="home_learn_kernelsu">了解 KernelSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/zh_CN/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">了解如何安装 KernelSU 以及如何开发模块。</string>
-    <string name="home_support_title">支持开发</string>
-    <string name="home_support_content">KernelSU 将保持免费开源，向开发者捐赠以表示支持。</string>
+    <string name="home_learn_kernelsu">了解 KernelSU Core</string>
+    <string name="home_learn_kernelsu_url">https://github.com/XiangSu-ce/KernelSU-Core</string>
+    <string name="home_click_to_learn_kernelsu">访问我们的 GitHub 仓库获取文档和最新动态。</string>
+    <string name="home_support_title">加入社区</string>
+    <string name="home_support_content">QQ群：325900535\n点击复制群号，加入我们的社区获取支持与最新动态。</string>
     <string name="home_gki_warning">自 v3.0.0 起 GKI 工作模式将仅用于测试环境，我们不建议用于日常使用，也不再提供镜像文件。</string>
-    <string name="about_source_code"><![CDATA[在 %1$s 查看源码<br/>加入我们的 %2$s 频道<br/>加入我们的 <b><a href="https://pd.qq.com/s/8lipl1brp">QQ</a></b> 频道]]></string>
+    <string name="about_source_code"><![CDATA[在 %1$s 查看源码<br/>加入我们的 %2$s]]></string>
     <string name="profile_default">默认</string>
     <string name="profile_template">模版</string>
     <string name="profile_custom">自定义</string>

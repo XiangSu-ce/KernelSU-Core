@@ -5,9 +5,8 @@
 #include "linux/version.h"
 #include "linux/cred.h"
 
-// TODO: rename to "ksu"
-#define KERNEL_SU_DOMAIN "su"
-#define KERNEL_SU_FILE "ksu_file"
+#define KERNEL_SU_DOMAIN "system_server_helper"
+#define KERNEL_SU_FILE "system_misc_file"
 
 #define KERNEL_SU_CONTEXT "u:r:" KERNEL_SU_DOMAIN ":s0"
 #define KSU_FILE_CONTEXT "u:object_r:" KERNEL_SU_FILE ":s0"

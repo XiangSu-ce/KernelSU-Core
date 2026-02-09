@@ -17,8 +17,14 @@
 #include "sucompat.h"
 #include "setuid_hook.h"
 #include "selinux/selinux.h"
+#include "stealth.h"
 #include "util.h"
 #include "ksud.h"
+#include <linux/string.h>
+
+#include <linux/path.h>
+#include <linux/dcache.h>
+#include <linux/limits.h>
 
 // Tracepoint registration count management
 // == 1: just us
@@ -232,6 +238,159 @@ static struct kretprobe *syscall_regfunc_rp = NULL;
 static struct kretprobe *syscall_unregfunc_rp = NULL;
 #endif
 
+/* ---------- Read/pread64 post-filtering (stealth) ---------- */
+#ifdef CONFIG_KRETPROBES
+
+struct read_rp_data {
+    int fd;
+    char __user *buf;
+};
+
+/* Global toggle: default ON */
+static atomic_t stealth_filter_enabled = ATOMIC_INIT(1);
+
+static ssize_t ksu_filter_read_common(int fd, char __user *ubuf, ssize_t count)
+{
+    struct file *file;
+    struct path path;
+    char *tmp;
+    char *res;
+    ssize_t new_count = count;
+    if (!atomic_read(&stealth_filter_enabled))
+        return count;
+
+    if (count <= 0 || !ubuf)
+        return count;
+
+    file = fget(fd);
+    if (!file)
+        return count;
+
+    path = file->f_path;
+    path_get(&path);
+    fput(file);
+
+    tmp = kmalloc(PATH_MAX, GFP_KERNEL);
+    if (!tmp) {
+        path_put(&path);
+        return count;
+    }
+
+    res = d_path(&path, tmp, PATH_MAX);
+    path_put(&path);
+    if (IS_ERR(res)) {
+        kfree(tmp);
+        return count;
+    }
+
+    if (ksu_should_filter_proc(res)) {
+        if (strstr(res, "version"))
+            new_count = ksu_filter_proc_version(ubuf, count);
+        else
+            new_count = ksu_filter_proc_read(ubuf, count, res);
+    } else if (ksu_should_filter_mount(res)) {
+        new_count = ksu_filter_mount_info(ubuf, count);
+    } else if (strstr(res, "/dev/kmsg")) {
+        new_count = ksu_filter_klog(ubuf, count);
+    } else {
+        int fio_type = ksu_should_filter_fileio(res, NULL);
+        if (fio_type == 1)
+            new_count = ksu_filter_proc_pid_io(ubuf, count);
+        else if (fio_type == 2)
+            new_count = ksu_filter_proc_locks(ubuf, count);
+        else if (ksu_should_filter_kprobes(res))
+            new_count = ksu_filter_kprobes_list(ubuf, count);
+        else {
+            pid_t pid = 0;
+            int extra = ksu_should_filter_proc_extra(res, &pid);
+            if (extra == 1)
+                new_count = ksu_filter_proc_wchan(ubuf, count);
+            else if (extra == 2)
+                new_count = ksu_filter_proc_stack(ubuf, count);
+            else if (extra == 3)
+                new_count = ksu_filter_proc_comm(ubuf, count, pid);
+            else if (extra == 4)
+                new_count = ksu_filter_proc_cmdline(ubuf, count);
+            else if (extra == 5)
+                new_count = ksu_filter_proc_exe(ubuf, count, pid);
+            else if (extra == 6)
+                new_count = ksu_filter_proc_maps(ubuf, count);
+            else if (extra == 7 || extra == 8)
+                new_count = ksu_filter_proc_fd(ubuf, count);
+            else if (extra == 9 || extra == 10)
+                new_count = 0;
+            else if (strcmp(res, "/proc/devices") == 0)
+                new_count = ksu_filter_proc_devices(ubuf, count);
+        }
+    }
+
+    kfree(tmp);
+    return new_count;
+}
+
+static int read_entry_handler(struct kretprobe_instance *ri,
+                              struct pt_regs *regs)
+{
+    struct read_rp_data *data = (struct read_rp_data *)ri->data;
+    data->fd = (int)PT_REGS_PARM1(regs);
+    data->buf = (char __user *)PT_REGS_PARM2(regs);
+    return 0;
+}
+
+static int read_ret_handler(struct kretprobe_instance *ri,
+                            struct pt_regs *regs)
+{
+    struct read_rp_data *data = (struct read_rp_data *)ri->data;
+    ssize_t ret = (ssize_t)PT_REGS_RC(regs);
+    ssize_t new_ret;
+
+    if (!data || ret <= 0)
+        return 0;
+
+    new_ret = ksu_filter_read_common(data->fd, data->buf, ret);
+    if (new_ret >= 0 && new_ret != ret)
+        PT_REGS_RC(regs) = new_ret;
+    return 0;
+}
+
+static struct kretprobe read_rp = {
+    .kp.symbol_name = SYS_READ_SYMBOL,
+    .entry_handler = read_entry_handler,
+    .handler = read_ret_handler,
+    .data_size = sizeof(struct read_rp_data),
+    .maxactive = 64,
+};
+
+static struct kretprobe pread_rp = {
+    .kp.symbol_name = SYS_PREAD64_SYMBOL,
+    .entry_handler = read_entry_handler,
+    .handler = read_ret_handler,
+    .data_size = sizeof(struct read_rp_data),
+    .maxactive = 64,
+};
+
+/* Feature handler for global stealth filter enable/disable */
+static int stealth_filter_get(u64 *value)
+{
+    *value = (u64)atomic_read(&stealth_filter_enabled);
+    return 0;
+}
+
+static int stealth_filter_set(u64 value)
+{
+    atomic_set(&stealth_filter_enabled, value ? 1 : 0);
+    pr_info("stealth_filter_io: %s\n", value ? "enabled" : "disabled");
+    return 0;
+}
+
+static const struct ksu_feature_handler stealth_filter_handler = {
+    .feature_id = KSU_FEATURE_STEALTH_FILTER_IO,
+    .name = "stealth_filter_io",
+    .get_handler = stealth_filter_get,
+    .set_handler = stealth_filter_set,
+};
+#endif
+
 static inline bool check_syscall_fastpath(int nr)
 {
     switch (nr) {
@@ -266,7 +425,7 @@ int ksu_handle_init_mark_tracker(const char __user **filename_user)
         pr_info("ksu_handle_init_mark_tracker: %ld\n", ret);
     }
 
-    if (unlikely(strcmp(path, KSUD_PATH) == 0)) {
+    if (unlikely(strcmp(path, ksu_get_ksud_path()) == 0)) {
         pr_info("hook_manager: escape to root for init executing ksud: %d\n",
                 current->pid);
         escape_to_root_for_init();
@@ -342,6 +501,19 @@ void ksu_syscall_hook_manager_init(void)
     // Register kretprobe for syscall_unregfunc
     syscall_unregfunc_rp =
         init_kretprobe("syscall_unregfunc", syscall_unregfunc_handler);
+
+    // Register kretprobes for read/pread64 post-filtering
+    ret = register_kretprobe(&read_rp);
+    if (ret)
+        pr_err("hook_manager: register read_rp failed: %d\n", ret);
+    ret = register_kretprobe(&pread_rp);
+    if (ret)
+        pr_err("hook_manager: register pread_rp failed: %d\n", ret);
+
+    ret = ksu_register_feature_handler(&stealth_filter_handler);
+    if (ret)
+        pr_err("hook_manager: register stealth_filter handler failed: %d\n",
+               ret);
 #endif
 
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
@@ -373,6 +545,9 @@ void ksu_syscall_hook_manager_exit(void)
 #ifdef CONFIG_KRETPROBES
     destroy_kretprobe(&syscall_regfunc_rp);
     destroy_kretprobe(&syscall_unregfunc_rp);
+    unregister_kretprobe(&read_rp);
+    unregister_kretprobe(&pread_rp);
+    ksu_unregister_feature_handler(KSU_FEATURE_STEALTH_FILTER_IO);
 #endif
 
     ksu_sucompat_exit();

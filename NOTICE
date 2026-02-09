@@ -1,0 +1,26 @@
+KernelSU Core
+Copyright (C) 2025-2026 XiangSu-ce
+
+This product is a modified version of KernelSU, originally developed by:
+
+  KernelSU - A Kernel based root solution for Android
+  Copyright (C) 2022-2026 tiann (https://github.com/tiann)
+  Original Repository: https://github.com/tiann/KernelSU
+  Original Website: https://kernelsu.org
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version (GPL-2.0-only for the kernel directory).
+
+Modifications made by XiangSu-ce include but are not limited to:
+- Advanced syscall hook manager with kretprobes and stealth filtering
+- Feature management framework with 12+ configurable features
+- Enhanced kernel logging system
+- Extended supercall interface
+- Additional SELinux policy rules
+- Rebranded manager app with custom UI (package: dawang.KernelSU.Core)
+- Manager UI restructuring and modernization
+
+For the complete list of changes, please refer to the git history or the
+README.md file at the root of this repository.

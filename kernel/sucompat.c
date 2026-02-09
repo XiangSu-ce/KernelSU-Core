@@ -11,6 +11,7 @@
 #include <linux/version.h>
 #include <linux/sched/task_stack.h>
 #include <linux/ptrace.h>
+#include <linux/string.h>
 
 #include "allowlist.h"
 #include "feature.h"
@@ -64,9 +65,8 @@ static char __user *sh_user_path(void)
 
 static char __user *ksud_user_path(void)
 {
-    static const char ksud_path[] = KSUD_PATH;
-
-    return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
+    const char *path = ksu_get_ksud_path();
+    return userspace_stack_buffer(path, strlen(path) + 1);
 }
 
 int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,

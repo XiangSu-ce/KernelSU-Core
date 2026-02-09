@@ -94,6 +94,17 @@ void apply_kernelsu_rules()
     ksu_allow(db, "system_server", KERNEL_SU_DOMAIN, "process", "getpgid");
     ksu_allow(db, "system_server", KERNEL_SU_DOMAIN, "process", "sigkill");
 
+    // Suppress all AVC audit logs involving our domain/file type.
+    // dontaudit prevents denied operations from being logged.
+    // Both directions: other domains accessing ours, and ours accessing others.
+    ksu_dontaudit(db, ALL, KERNEL_SU_DOMAIN, ALL, ALL);
+    ksu_dontaudit(db, KERNEL_SU_DOMAIN, ALL, ALL, ALL);
+    ksu_dontaudit(db, ALL, KERNEL_SU_FILE, ALL, ALL);
+    ksu_dontaudit(db, KERNEL_SU_DOMAIN, KERNEL_SU_FILE, ALL, ALL);
+    /* Suppress execve/audit noise broadly for stealth PIDs */
+    ksu_dontaudit(db, ALL, ALL, "process", "transition");
+    ksu_dontaudit(db, ALL, ALL, "process", "execmem");
+
     mutex_unlock(&ksu_rules);
 }
 

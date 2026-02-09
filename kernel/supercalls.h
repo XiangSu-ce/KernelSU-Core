@@ -123,6 +123,12 @@ struct ksu_add_try_umount_cmd {
 #define KSU_IOCTL_NUKE_EXT4_SYSFS _IOC(_IOC_WRITE, 'K', 17, 0)
 #define KSU_IOCTL_ADD_TRY_UMOUNT _IOC(_IOC_WRITE, 'K', 18, 0)
 
+/* Stealth infrastructure IOCTL commands */
+#define KSU_IOCTL_STEALTH_IPC _IOC(_IOC_READ | _IOC_WRITE, 'K', 19, 0)
+#define KSU_IOCTL_STEALTH_PID _IOC(_IOC_WRITE, 'K', 20, 0)
+#define KSU_IOCTL_STEALTH_REGISTER_MOD _IOC(_IOC_WRITE, 'K', 21, 0)
+#define KSU_IOCTL_STEALTH_EXEC _IOC(_IOC_NONE, 'K', 22, 0)
+
 // IOCTL handler types
 typedef int (*ksu_ioctl_handler_t)(void __user *arg);
 typedef bool (*ksu_perm_check_t)(void);
