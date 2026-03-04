@@ -81,7 +81,7 @@ pub fn apply_sepolies() -> Result<()> {
     let sepolicies =
         std::fs::read_dir(path).with_context(|| "profile sepolicy dir open failed.".to_string())?;
     let mut entries: Vec<_> = sepolicies.flatten().collect();
-    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries.sort_by_key(|a| a.file_name());
     for sepolicy in entries {
         let sepolicy = sepolicy.path();
         if !sepolicy.is_file() {

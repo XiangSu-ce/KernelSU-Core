@@ -243,7 +243,7 @@ fn ksuctl<T>(request: i32, arg: *mut T) -> std::io::Result<i32> {
     let fd = get_driver_fd()?;
     match unsafe { ioctl_once(fd, request, arg) } {
         Ok(ret) => Ok(ret),
-        Err(err) if matches!(err.raw_os_error(), Some(libc::EBADF) | Some(libc::ENOTTY)) => {
+        Err(err) if matches!(err.raw_os_error(), Some(libc::EBADF | libc::ENOTTY)) => {
             // Cached fd may be stale after process lifecycle changes.
             DRIVER_FD.store(-1, Ordering::Release);
             let new_fd = get_driver_fd()?;

@@ -151,11 +151,7 @@ pub fn load_config(module_id: &str, config_type: ConfigType) -> Result<HashMap<S
         .with_context(|| "Failed to read count")?;
     let count = u32::from_le_bytes(count_buf) as usize;
     if count > MAX_CONFIG_COUNT {
-        bail!(
-            "Too many config entries in file: {} (max: {})",
-            count,
-            MAX_CONFIG_COUNT
-        );
+        bail!("Too many config entries in file: {count} (max: {MAX_CONFIG_COUNT})");
     }
 
     // Read entries
@@ -167,12 +163,7 @@ pub fn load_config(module_id: &str, config_type: ConfigType) -> Result<HashMap<S
             .with_context(|| format!("Failed to read key length for entry {i}"))?;
         let key_len = u32::from_le_bytes(key_len_buf) as usize;
         if key_len == 0 || key_len > MAX_CONFIG_KEY_LEN {
-            bail!(
-                "Invalid key length {} for entry {} (max: {})",
-                key_len,
-                i,
-                MAX_CONFIG_KEY_LEN
-            );
+            bail!("Invalid key length {key_len} for entry {i} (max: {MAX_CONFIG_KEY_LEN})");
         }
 
         // Read key data
@@ -190,12 +181,7 @@ pub fn load_config(module_id: &str, config_type: ConfigType) -> Result<HashMap<S
             .with_context(|| format!("Failed to read value length for entry {i}"))?;
         let value_len = u32::from_le_bytes(value_len_buf) as usize;
         if value_len > MAX_CONFIG_VALUE_LEN {
-            bail!(
-                "Invalid value length {} for entry {} (max: {})",
-                value_len,
-                i,
-                MAX_CONFIG_VALUE_LEN
-            );
+            bail!("Invalid value length {value_len} for entry {i} (max: {MAX_CONFIG_VALUE_LEN})");
         }
 
         // Read value data
@@ -404,7 +390,7 @@ pub fn get_all_module_configs() -> Result<HashMap<String, HashMap<String, String
         .with_context(|| format!("Failed to read config directory: {}", config_root.display()))?
         .flatten()
         .collect();
-    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries.sort_by_key(|a| a.file_name());
 
     for entry in entries {
         let path = entry.path();
@@ -446,7 +432,7 @@ pub fn clear_all_temp_configs() -> Result<()> {
         .with_context(|| format!("Failed to read config directory: {}", config_root.display()))?
         .flatten()
         .collect();
-    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries.sort_by_key(|a| a.file_name());
 
     for entry in entries {
         let path = entry.path();

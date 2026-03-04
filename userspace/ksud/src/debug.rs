@@ -124,10 +124,7 @@ pub fn stealth_pid_disguise(
         ensure!(!exe.trim().is_empty(), "fake_exe must not be empty");
     }
     ksucalls::stealth_pid_disguise(pid, fake_comm, fake_exe)?;
-    println!(
-        "Stealth disguise set for pid {pid}: comm={:?}, exe={:?}",
-        fake_comm, fake_exe
-    );
+    println!("Stealth disguise set for pid {pid}: comm={fake_comm:?}, exe={fake_exe:?}");
     Ok(())
 }
 
@@ -168,18 +165,18 @@ pub fn stealth_smoke(pid: i32, fake_comm: &str, fake_exe: &str, module_id: &str)
     ensure!(!module_id.trim().is_empty(), "module_id must not be empty");
 
     ksucalls::stealth_pid_mark(pid).context("stealth smoke: mark pid failed")?;
-    let mut final_result: Result<()> = Ok(());
-
-    if let Err(e) = ksucalls::stealth_pid_disguise(pid, Some(fake_comm), Some(fake_exe)) {
-        final_result = Err(e).context("stealth smoke: disguise failed");
-    }
+    let mut final_result: Result<()> =
+        if let Err(e) = ksucalls::stealth_pid_disguise(pid, Some(fake_comm), Some(fake_exe)) {
+            Err(e).context("stealth smoke: disguise failed")
+        } else {
+            Ok(())
+        };
 
     if final_result.is_ok()
         && let Err(e) = ksucalls::stealth_ipc_probe(module_id)
+        && e.raw_os_error() != Some(libc::ENOENT)
     {
-        if e.raw_os_error() != Some(libc::ENOENT) {
-            final_result = Err(e).context("stealth smoke: ipc probe failed");
-        }
+        final_result = Err(e).context("stealth smoke: ipc probe failed");
     }
 
     if final_result.is_ok()
