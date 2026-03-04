@@ -296,8 +296,7 @@ pub fn root_shell() -> Result<()> {
                 wrap_tty(2);
             }
 
-            set_identity(uid, gid, &groups)
-                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            set_identity(uid, gid, &groups).map_err(|e| std::io::Error::other(e.to_string()))?;
 
             std::io::Result::Ok(())
         })

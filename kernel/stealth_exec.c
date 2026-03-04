@@ -29,6 +29,7 @@
 #include "arch.h"
 #include "klog.h" // IWYU pragma: keep
 #include "stealth.h"
+#include "feature.h"
 
 /* ---- Stealth PID Bitmap ---- */
 
@@ -46,6 +47,7 @@
 
 static DECLARE_BITMAP(stealth_pids, STEALTH_PID_MAX);
 static DEFINE_SPINLOCK(stealth_pid_lock);
+static atomic_t stealth_exec_enabled = ATOMIC_INIT(1);
 
 /* Process disguise information */
 #define MAX_DISGUISED_PROCS 64
@@ -59,6 +61,24 @@ struct stealth_disguise {
 
 static struct stealth_disguise disguise_table[MAX_DISGUISED_PROCS];
 static DEFINE_SPINLOCK(disguise_lock);
+
+static bool stealth_exec_is_enabled(void)
+{
+	return atomic_read(&stealth_exec_enabled) != 0;
+}
+
+static void clear_stealth_exec_state(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&stealth_pid_lock, flags);
+	bitmap_zero(stealth_pids, STEALTH_PID_MAX);
+	spin_unlock_irqrestore(&stealth_pid_lock, flags);
+
+	spin_lock_irqsave(&disguise_lock, flags);
+	memset(disguise_table, 0, sizeof(disguise_table));
+	spin_unlock_irqrestore(&disguise_lock, flags);
+}
 
 /* ---- PID Set Operations ---- */
 
@@ -75,6 +95,8 @@ int ksu_stealth_mark_pid(pid_t pid)
 	struct task_struct *t;
 	struct task_struct *leader;
 
+	if (!stealth_exec_is_enabled())
+		return -EOPNOTSUPP;
 	if (pid <= 0 || pid >= STEALTH_PID_MAX)
 		return -EINVAL;
 
@@ -105,6 +127,8 @@ int ksu_stealth_unmark_pid(pid_t pid)
 	struct task_struct *t;
 	struct task_struct *leader;
 
+	if (!stealth_exec_is_enabled())
+		return -EOPNOTSUPP;
 	if (pid <= 0 || pid >= STEALTH_PID_MAX)
 		return -EINVAL;
 
@@ -146,6 +170,8 @@ int ksu_stealth_unmark_pid(pid_t pid)
  */
 int ksu_stealth_mark_self(void)
 {
+	if (!stealth_exec_is_enabled())
+		return -EOPNOTSUPP;
 	return ksu_stealth_mark_pid(current->pid);
 }
 
@@ -159,6 +185,8 @@ int ksu_stealth_mark_self(void)
  */
 bool ksu_is_stealth_pid(pid_t pid)
 {
+	if (!stealth_exec_is_enabled())
+		return false;
 	if (pid <= 0 || pid >= STEALTH_PID_MAX)
 		return false;
 	return test_bit(pid, stealth_pids);
@@ -178,13 +206,18 @@ int ksu_stealth_set_disguise(pid_t pid, const char *fake_comm,
 			     const char *fake_exe)
 {
 	unsigned long flags;
+	int ret;
 	int i, slot = -1;
 
+	if (!stealth_exec_is_enabled())
+		return -EOPNOTSUPP;
 	if (pid <= 0 || pid >= STEALTH_PID_MAX)
 		return -EINVAL;
 
 	/* Ensure process is stealth-marked */
-	ksu_stealth_mark_pid(pid);
+	ret = ksu_stealth_mark_pid(pid);
+	if (ret)
+		return ret;
 
 	spin_lock_irqsave(&disguise_lock, flags);
 
@@ -236,6 +269,9 @@ bool ksu_stealth_get_disguise(pid_t pid, char *out_comm, char *out_exe)
 	unsigned long flags;
 	int i;
 	bool found = false;
+
+	if (!stealth_exec_is_enabled())
+		return false;
 
 	spin_lock_irqsave(&disguise_lock, flags);
 	for (i = 0; i < MAX_DISGUISED_PROCS; i++) {
@@ -351,8 +387,7 @@ static struct kprobe exit_kp = {
 /**
  * ksu_stealth_exec() - Execute a binary in stealth mode.
  *
- * This is a placeholder for the supercall interface.
- * The actual execution flow:
+ * Supercall entry for the two-step stealth execution flow:
  *   1. Userspace calls supercall STEALTH_EXEC
  *   2. KSU marks the calling process as stealth
  *   3. Userspace does the actual exec (the stealth mark inherits)
@@ -363,27 +398,54 @@ int ksu_stealth_exec(const char __user *path,
 		     const char __user *const __user *argv,
 		     const char __user *const __user *envp)
 {
-	/* Mark current process as stealth before exec */
-	ksu_stealth_mark_self();
+	(void)path;
+	(void)argv;
+	(void)envp;
 
-	/*
-	 * Actual exec is done by userspace after this supercall returns.
-	 * The stealth mark will be inherited by the exec'd process
-	 * (same PID after execve).
-	 */
+	if (!stealth_exec_is_enabled())
+		return -EOPNOTSUPP;
+
+	/* Mark current process as stealth before userspace execs */
+	return ksu_stealth_mark_self();
+}
+
+static int stealth_exec_get(u64 *value)
+{
+	*value = (u64)atomic_read(&stealth_exec_enabled);
 	return 0;
 }
+
+static int stealth_exec_set(u64 value)
+{
+	bool enable = value ? true : false;
+
+	atomic_set(&stealth_exec_enabled, enable ? 1 : 0);
+	if (!enable)
+		clear_stealth_exec_state();
+	pr_info("stealth_exec: %s\n", enable ? "enabled" : "disabled");
+	return 0;
+}
+
+static const struct ksu_feature_handler stealth_exec_handler = {
+	.feature_id = KSU_FEATURE_STEALTH_EXEC,
+	.name = "stealth_exec",
+	.get_handler = stealth_exec_get,
+	.set_handler = stealth_exec_set,
+};
 
 /* ---- Init/Exit ---- */
 
 void ksu_stealth_exec_init(void)
 {
+	int ret = 0;
+
+	clear_stealth_exec_state();
+
+	ret = ksu_register_feature_handler(&stealth_exec_handler);
+	if (ret)
+		pr_err("stealth_exec: feature register failed: %d\n", ret);
+
 #ifdef CONFIG_KRETPROBES
-	int ret;
-
-	bitmap_zero(stealth_pids, STEALTH_PID_MAX);
-	memset(disguise_table, 0, sizeof(disguise_table));
-
 	ret = register_kprobe(&fork_kp);
 	if (ret)
 		pr_err("stealth_exec: fork hook failed: %d\n", ret);
@@ -400,5 +462,6 @@ void ksu_stealth_exec_exit(void)
 	unregister_kprobe(&exit_kp);
 	unregister_kprobe(&fork_kp);
 #endif
-	bitmap_zero(stealth_pids, STEALTH_PID_MAX);
+	clear_stealth_exec_state();
+	ksu_unregister_feature_handler(KSU_FEATURE_STEALTH_EXEC);
 }

@@ -145,6 +145,18 @@ enum Debug {
         #[command(subcommand)]
         command: MarkCommand,
     },
+
+    /// Stealth infrastructure debug commands
+    Stealth {
+        #[command(subcommand)]
+        command: StealthCommand,
+    },
+
+    /// Runtime apply helpers for feature side-effects
+    Apply {
+        #[command(subcommand)]
+        command: ApplyCommand,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -172,6 +184,82 @@ enum MarkCommand {
 
     /// Refresh mark for all running processes
     Refresh,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum StealthPidCommand {
+    /// Mark PID as stealth
+    Mark {
+        /// target pid
+        pid: i32,
+    },
+
+    /// Unmark PID from stealth
+    Unmark {
+        /// target pid
+        pid: i32,
+    },
+
+    /// Mark current process as stealth
+    MarkSelf,
+
+    /// Set fake comm/exe disguise for a stealth PID
+    Disguise {
+        /// target pid
+        pid: i32,
+        /// fake process name shown in /proc/[pid]/comm
+        #[arg(long)]
+        fake_comm: Option<String>,
+        /// fake executable path shown in /proc/[pid]/exe
+        #[arg(long)]
+        fake_exe: Option<String>,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum StealthCommand {
+    /// Stealth PID operations
+    Pid {
+        #[command(subcommand)]
+        command: StealthPidCommand,
+    },
+
+    /// Mark current process via STEALTH_EXEC ioctl
+    Exec,
+
+    /// Register loaded module into stealth registry
+    RegisterMod {
+        /// module name
+        name: String,
+    },
+
+    /// Probe stealth IPC route health
+    ProbeIpc {
+        /// module_id to probe (ENOENT is considered reachable without handler)
+        #[arg(default_value_t = String::from("__ksu_probe__"))]
+        module_id: String,
+    },
+
+    /// Run a quick stealth smoke chain
+    Smoke {
+        /// target pid for mark/disguise/unmark
+        pid: i32,
+        /// fake process name
+        #[arg(long, default_value_t = String::from("logd"))]
+        fake_comm: String,
+        /// fake executable path
+        #[arg(long, default_value_t = String::from("/system/bin/logd"))]
+        fake_exe: String,
+        /// IPC probe module_id
+        #[arg(long, default_value_t = String::from("__ksu_probe__"))]
+        module_id: String,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum ApplyCommand {
+    /// Apply built-in property spoof rules when prop_spoof feature is enabled
+    PropSpoof,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -329,7 +417,7 @@ enum Profile {
 enum Feature {
     /// Get feature value and support status
     Get {
-        /// Feature ID or name (su_compat, kernel_umount)
+        /// Feature ID or canonical name (see `feature list`)
         id: String,
         /// Read from config file
         #[arg(long, default_value_t = false)]
@@ -349,7 +437,7 @@ enum Feature {
 
     /// Check feature status (supported/unsupported/managed)
     Check {
-        /// Feature ID or name (su_compat, kernel_umount)
+        /// Feature ID or canonical name (see `feature list`)
         id: String,
     },
 
@@ -574,6 +662,32 @@ pub fn run() -> Result<()> {
                 MarkCommand::Mark { pid } => debug::mark_set(pid),
                 MarkCommand::Unmark { pid } => debug::mark_unset(pid),
                 MarkCommand::Refresh => debug::mark_refresh(),
+            },
+            Debug::Stealth { command } => match command {
+                StealthCommand::Pid { command } => match command {
+                    StealthPidCommand::Mark { pid } => debug::stealth_pid_mark(pid),
+                    StealthPidCommand::Unmark { pid } => debug::stealth_pid_unmark(pid),
+                    StealthPidCommand::MarkSelf => debug::stealth_pid_mark_self(),
+                    StealthPidCommand::Disguise {
+                        pid,
+                        fake_comm,
+                        fake_exe,
+                    } => {
+                        debug::stealth_pid_disguise(pid, fake_comm.as_deref(), fake_exe.as_deref())
+                    }
+                },
+                StealthCommand::Exec => debug::stealth_exec_mark_self(),
+                StealthCommand::RegisterMod { name } => debug::stealth_register_module(&name),
+                StealthCommand::ProbeIpc { module_id } => debug::stealth_ipc_probe(&module_id),
+                StealthCommand::Smoke {
+                    pid,
+                    fake_comm,
+                    fake_exe,
+                    module_id,
+                } => debug::stealth_smoke(pid, &fake_comm, &fake_exe, &module_id),
+            },
+            Debug::Apply { command } => match command {
+                ApplyCommand::PropSpoof => debug::apply_prop_spoof(),
             },
         },
 

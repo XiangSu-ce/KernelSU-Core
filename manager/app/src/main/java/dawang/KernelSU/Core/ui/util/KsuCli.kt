@@ -34,6 +34,10 @@ private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
 }
 
+private fun getKsuInitPath(): String {
+    return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksuinit.so"
+}
+
 private fun shellQuote(arg: String): String {
     return "'" + arg.replace("'", "'\"'\"'") + "'"
 }
@@ -113,7 +117,10 @@ suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.
         .add("${getKsuDaemonPath()} feature check ${shellQuote(feature)}")
         .to(ArrayList<String>(), null)
         .exec().out
-    out.firstOrNull()?.trim().orEmpty()
+    out.asSequence()
+        .map { it.trim() }
+        .firstOrNull { it == "managed" || it == "supported" || it == "unsupported" }
+        ?: out.firstOrNull()?.trim().orEmpty()
 }
 
 suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatchers.IO) {
@@ -322,6 +329,13 @@ fun installBoot(
 
     if (ota) {
         cmd += " -u"
+    }
+
+    // Pass ksuinit from manager's native libs if available (ensures boot-patch
+    // works even when ksud was built without ksuinit in its embedded assets)
+    val ksuInitFile = File(getKsuInitPath())
+    if (ksuInitFile.exists()) {
+        cmd += " --init ${shellQuote(ksuInitFile.absolutePath)}"
     }
 
     var lkmFile: File? = null

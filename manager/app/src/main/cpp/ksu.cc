@@ -24,9 +24,14 @@ static int fd = -1;
 static std::mutex fd_mutex;
 static constexpr uint32_t KSU_INSTALL_MAGIC1 = 0xDEADBEEF;
 static constexpr uint32_t KSU_INSTALL_MAGIC2 = 0xCAFEBABE;
+static constexpr const char *KSU_DRIVER_FD_NAMES[] = {"[ksu_driver]", "[timerfd]"};
+
+static inline bool is_valid_driver_fd(int candidate_fd) {
+    struct ksu_check_safemode_cmd cmd = {};
+    return ioctl(candidate_fd, KSU_IOCTL_CHECK_SAFEMODE, &cmd) == 0;
+}
 
 static inline int scan_driver_fd() {
-    const char *kName = "[timerfd]";
     DIR *dir = opendir("/proc/self/fd");
     if (!dir) {
         return -1;
@@ -58,8 +63,16 @@ static inline int scan_driver_fd() {
         const char *base = strrchr(target, '/');
         base = base ? base + 1 : target;
 
-        if (strstr(base, kName)) {
-            found = (int)fd_long;
+        for (const char *name : KSU_DRIVER_FD_NAMES) {
+            if (strstr(base, name)) {
+                int candidate = (int)fd_long;
+                if (is_valid_driver_fd(candidate)) {
+                    found = candidate;
+                }
+                break;
+            }
+        }
+        if (found >= 0) {
             break;
         }
     }
@@ -123,7 +136,7 @@ static int ksuctl(unsigned long op, Args &&... args) {
     static_assert(sizeof...(Args) <= 1, "ioctl expects at most one extra argument");
 
     int ret = ioctl(fd, op, std::forward<Args>(args)...);
-    if (ret < 0 && errno == EBADF) {
+    if (ret < 0 && (errno == EBADF || errno == ENOTTY)) {
         // Driver fd may be stale after process lifecycle changes, reacquire once.
         fd = -1;
         fd = init_driver_fd();

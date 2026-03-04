@@ -18,17 +18,11 @@
  * hooks. They implement the filtering logic but do NOT register their own
  * interception points.
  *
- * TODO: These need to be wired into the actual read() interception path.
- * Options include:
- *   1. Add hooks in the sys_enter tracepoint handler (syscall_hook_manager.c)
- *      to intercept __NR_read for /proc files and /dev/kmsg
- *   2. Register kprobes on specific proc seq_show functions
- *   3. Hook vfs_read for targeted file paths
- *
- * Currently active modules (self-contained, no hook wiring needed):
- *   - debug_disable: directly modifies sysctl values at init
- *   - symbol_hide: directly removes module from list at init
- *   - prop_spoof: provides rules for ksud to apply via resetprop
+ * Wiring status:
+ * - Read/pread and path-based filtering are wired through
+ *   syscall_hook_manager.c kretprobes.
+ * - debug_disable and symbol_hide are self-contained.
+ * - prop_spoof runtime value application is performed by ksud via resetprop.
  */
 
 #include <linux/types.h>

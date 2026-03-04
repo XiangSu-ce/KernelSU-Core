@@ -32,6 +32,7 @@
 
 #include "klog.h" // IWYU pragma: keep
 #include "util.h"
+#include "feature.h"
 
 /* ---- Stealth Module Registry ---- */
 
@@ -51,6 +52,7 @@ struct stealth_module_entry {
 static struct stealth_module_entry registry[MAX_STEALTH_MODULES];
 static DEFINE_MUTEX(registry_lock);
 static int registry_count;
+static atomic_t stealth_modloader_enabled = ATOMIC_INIT(1);
 
 /*
  * Flat prefix array for fast iteration by filter modules.
@@ -68,6 +70,11 @@ static int registry_count;
 static const char *prefix_buf[2][PREFIX_CACHE_SIZE];
 static atomic_t active_prefix_idx = ATOMIC_INIT(0);
 static atomic_t prefix_cache_valid = ATOMIC_INIT(0);
+
+static bool modloader_enabled(void)
+{
+	return atomic_read(&stealth_modloader_enabled) != 0;
+}
 
 static void rebuild_prefix_cache(void)
 {
@@ -118,6 +125,8 @@ const char **ksu_get_stealth_symbol_prefixes(void)
 {
 	int cur;
 
+	if (!modloader_enabled())
+		return NULL;
 	if (!atomic_read(&prefix_cache_valid) || registry_count == 0)
 		return NULL;
 	smp_rmb();  /* pair with smp_wmb() in rebuild_prefix_cache */
@@ -230,6 +239,14 @@ static void ksu_restore_console(void)
 	mutex_unlock(&printk_lock);
 }
 
+static void restore_console_all(void)
+{
+	if (!p_console_printk)
+		return;
+	while (printk_suppress_depth > 0)
+		ksu_restore_console();
+}
+
 /* ---- Public API ---- */
 
 #include "stealth.h"
@@ -253,6 +270,8 @@ int ksu_stealth_register_module(const char *name,
 	struct module *mod;
 	int i, slot = -1;
 
+	if (!modloader_enabled())
+		return -EOPNOTSUPP;
 	if (!name || strlen(name) == 0)
 		return -EINVAL;
 
@@ -371,6 +390,8 @@ bool ksu_is_stealth_module(const char *name)
 	int i;
 	bool found = false;
 
+	if (!modloader_enabled())
+		return false;
 	if (!name)
 		return false;
 
@@ -421,6 +442,8 @@ int ksu_stealth_load_module(const char __user *path,
 
 	if (!path)
 		return -EINVAL;
+	if (!modloader_enabled())
+		return -EOPNOTSUPP;
 
 	/* Retry symbol resolution lazily in case init-time lookup failed */
 	resolve_module_mutex();
@@ -569,6 +592,8 @@ int ksu_stealth_load_module(const char __user *path,
 
 void ksu_stealth_suppress_printk_start(void)
 {
+	if (!modloader_enabled())
+		return;
 	if (!ksu_ensure_kallsyms_lookup())
 		return;
 	ksu_suppress_console();
@@ -579,15 +604,45 @@ void ksu_stealth_suppress_printk_stop(void)
 	ksu_restore_console();
 }
 
+static int stealth_modloader_get(u64 *value)
+{
+	*value = (u64)atomic_read(&stealth_modloader_enabled);
+	return 0;
+}
+
+static int stealth_modloader_set(u64 value)
+{
+	bool enable = value ? true : false;
+
+	atomic_set(&stealth_modloader_enabled, enable ? 1 : 0);
+	if (!enable)
+		restore_console_all();
+	pr_info("stealth_modloader: %s\n", enable ? "enabled" : "disabled");
+	return 0;
+}
+
+static const struct ksu_feature_handler stealth_modloader_handler = {
+	.feature_id = KSU_FEATURE_STEALTH_MODLOADER,
+	.name = "stealth_modloader",
+	.get_handler = stealth_modloader_get,
+	.set_handler = stealth_modloader_set,
+};
+
 /* ---- Init/Exit ---- */
 
 void ksu_stealth_modloader_init(void)
 {
+	int ret;
+
 	memset(registry, 0, sizeof(registry));
 	registry_count = 0;
 	memset(prefix_buf, 0, sizeof(prefix_buf));
 	printk_suppress_depth = 0;
 	saved_loglevel = -1;
+
+	ret = ksu_register_feature_handler(&stealth_modloader_handler);
+	if (ret)
+		pr_err("stealth_modloader: feature register failed: %d\n", ret);
 
 	ksu_ensure_kallsyms_lookup();
 	resolve_module_mutex();
@@ -597,6 +652,6 @@ void ksu_stealth_modloader_init(void)
 void ksu_stealth_modloader_exit(void)
 {
 	/* Ensure console loglevel is restored even on unmatched start/stop pairs */
-	while (printk_suppress_depth > 0)
-		ksu_restore_console();
+	restore_console_all();
+	ksu_unregister_feature_handler(KSU_FEATURE_STEALTH_MODLOADER);
 }

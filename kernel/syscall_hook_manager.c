@@ -25,10 +25,14 @@
 #include "ksud.h"
 #include <linux/file.h>
 #include <linux/string.h>
+#include <linux/fcntl.h>
+#include <linux/fs_struct.h>
+#include <linux/stat.h>
 
 #include <linux/path.h>
 #include <linux/dcache.h>
 #include <linux/limits.h>
+#include <linux/namei.h>
 
 // Tracepoint registration count management
 // == 1: just us
@@ -268,19 +272,20 @@ struct read_rp_data {
     int fd;
     char __user *buf;
 };
+#define KSU_PROC_PATH_BUFSZ PATH_MAX
 struct readlink_rp_data {
     char __user *buf;
     int bufsiz;
     pid_t pid;
     bool match;
     int kind;
-    char path[128];
+    char path[KSU_PROC_PATH_BUFSZ];
     char ns_type[16];
     int fd_num;
 };
 struct path_rp_data {
     bool match;
-    char path[128];
+    char path[KSU_PROC_PATH_BUFSZ];
 };
 struct pid_rp_data {
     bool match;
@@ -301,6 +306,7 @@ static bool ksu_match_tracefs_path(const char *path, int *kind_out);
 static bool ksu_match_cgroup_pid_path(const char *path);
 static bool ksu_match_sys_module_path(const char *path, char *mod,
 				      size_t modlen);
+static bool ksu_should_hide_stealth_pid_access(void);
 
 static ssize_t ksu_filter_read_common(int fd, char __user *ubuf, ssize_t count)
 {
@@ -308,9 +314,8 @@ static ssize_t ksu_filter_read_common(int fd, char __user *ubuf, ssize_t count)
     struct path path;
     char *tmp;
     char *res;
+    bool io_filter_enabled = atomic_read(&stealth_filter_enabled) != 0;
     ssize_t new_count = count;
-    if (!atomic_read(&stealth_filter_enabled))
-        return count;
 
     if (count <= 0 || !ubuf)
         return count;
@@ -364,7 +369,8 @@ static ssize_t ksu_filter_read_common(int fd, char __user *ubuf, ssize_t count)
                 new_count = ksu_filter_proc_fd(ubuf, count);
                 break;
             case KSU_FILTER_IO:
-                new_count = ksu_filter_proc_pid_io(ubuf, count);
+                if (io_filter_enabled)
+                    new_count = ksu_filter_proc_pid_io(ubuf, count);
                 break;
             case KSU_FILTER_STATUS:
                 new_count = ksu_filter_proc_status(ubuf, count, pid);
@@ -427,9 +433,9 @@ static ssize_t ksu_filter_read_common(int fd, char __user *ubuf, ssize_t count)
             new_count = ksu_filter_klog(ubuf, count);
         } else {
             int fio_type = ksu_should_filter_fileio(res, NULL);
-            if (fio_type == 1)
+            if (io_filter_enabled && fio_type == 1)
                 new_count = ksu_filter_proc_pid_io(ubuf, count);
-            else if (fio_type == 2)
+            else if (io_filter_enabled && fio_type == 2)
                 new_count = ksu_filter_proc_locks(ubuf, count);
             else if (ksu_should_filter_kprobes(res))
                 new_count = ksu_filter_kprobes_list(ubuf, count);
@@ -463,8 +469,9 @@ static bool ksu_match_stealth_proc_path(const char *path)
 {
     const char *p;
     pid_t pid = 0;
+    bool has_pid = false;
 
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return false;
     if (!path || strncmp(path, "/proc/", 6) != 0)
         return false;
@@ -472,18 +479,50 @@ static bool ksu_match_stealth_proc_path(const char *path)
     p = path + 6;
     if (!strncmp(p, "self", 4) && (p[4] == '/' || p[4] == '\0')) {
         pid = current->tgid;
+        p += 4;
+        has_pid = true;
     } else if (!strncmp(p, "thread-self", 11) &&
                (p[11] == '/' || p[11] == '\0')) {
-        pid = current->tgid;
+        pid = current->pid;
+        p += 11;
+        has_pid = true;
     } else {
         while (*p >= '0' && *p <= '9' && pid < 10000000) {
             pid = pid * 10 + (*p - '0');
             p++;
         }
+        if (*p != '\0' && *p != '/')
+            return false;
+        has_pid = pid > 0;
+    }
+    if (!has_pid)
+        return false;
+    if (!strncmp(p, "/task/", 6)) {
+        pid_t tid = 0;
+
+        p += 6;
+        while (*p >= '0' && *p <= '9' && tid < 10000000) {
+            tid = tid * 10 + (*p - '0');
+            p++;
+        }
+        if (tid <= 0 || (*p != '\0' && *p != '/'))
+            return false;
+        pid = tid;
     }
     if (pid <= 0)
         return false;
     return ksu_is_stealth_pid(pid);
+}
+
+static bool ksu_should_hide_stealth_pid_access(void)
+{
+    uid_t uid = current_uid().val;
+
+    if (uid == 0 || uid == 1000 || uid == 2000)
+        return false;
+    if (ksu_is_allow_uid(uid))
+        return false;
+    return true;
 }
 
 static bool ksu_match_tracefs_path(const char *path, int *kind_out)
@@ -560,24 +599,124 @@ static bool ksu_match_sys_module_path(const char *path, char *mod,
     return i > 0;
 }
 
+static bool ksu_resolve_proc_path_at(int dfd, const char *rel_path,
+				     char *out_path, size_t out_len)
+{
+	struct file *file;
+	struct path path, resolved_path;
+	char *tmp;
+	char *joined;
+	char *base;
+	int ret;
+	int n;
+	bool ok = false;
+
+	if (!rel_path || !out_path || out_len == 0)
+		return false;
+
+	if (rel_path[0] == '/') {
+		return strscpy(out_path, rel_path, out_len) >= 0;
+	}
+
+	if (dfd == AT_FDCWD)
+		get_fs_pwd(current->fs, &path);
+	else {
+		file = fget(dfd);
+		if (!file)
+			return false;
+		if (!S_ISDIR(file_inode(file)->i_mode)) {
+			fput(file);
+			return false;
+		}
+
+		path = file->f_path;
+		path_get(&path);
+		fput(file);
+	}
+
+	tmp = kmalloc(PATH_MAX, GFP_KERNEL);
+	if (!tmp) {
+		path_put(&path);
+		return false;
+	}
+	joined = kmalloc(PATH_MAX, GFP_KERNEL);
+	if (!joined) {
+		path_put(&path);
+		goto out;
+	}
+
+	base = d_path(&path, tmp, PATH_MAX);
+	path_put(&path);
+	if (IS_ERR(base))
+		goto out;
+	if (!base[0])
+		goto out;
+
+	n = snprintf(joined, PATH_MAX, "%s%s%s", base,
+		     (base[strlen(base) - 1] == '/') ? "" : "/",
+		     rel_path);
+	if (n < 0 || n >= PATH_MAX)
+		goto out;
+
+	ret = kern_path(joined, LOOKUP_FOLLOW, &resolved_path);
+	if (!ret) {
+		base = d_path(&resolved_path, tmp, PATH_MAX);
+		path_put(&resolved_path);
+		if (!IS_ERR(base) && strncmp(base, "/proc", 5) == 0 &&
+		    (base[5] == '\0' || base[5] == '/') &&
+		    strscpy(out_path, base, out_len) >= 0) {
+			ok = true;
+			goto out;
+		}
+	}
+
+	/*
+	 * Fallback for entries that may fail canonical lookup but still
+	 * clearly reside under /proc from dirfd/cwd context.
+	 */
+	if (strncmp(base, "/proc", 5) == 0 &&
+	    (base[5] == '\0' || base[5] == '/')) {
+		n = snprintf(out_path, out_len, "%s%s%s", base,
+			     (base[strlen(base) - 1] == '/') ? "" : "/",
+			     rel_path);
+		if (n >= 0 && (size_t)n < out_len)
+			ok = true;
+	}
+out:
+	kfree(joined);
+	kfree(tmp);
+	return ok;
+}
+
 static int procpath_entry_handler(struct kretprobe_instance *ri,
                                   struct pt_regs *regs)
 {
     struct path_rp_data *data = (struct path_rp_data *)ri->data;
     struct pt_regs *real_regs = PT_REAL_REGS(regs);
+    int dfd = (int)PT_REGS_PARM1(real_regs);
     const char __user *path = (const char __user *)PT_REGS_PARM2(real_regs);
+    const char *path_to_match = data->path;
+    char resolved_path[KSU_PROC_PATH_BUFSZ];
     long path_len;
 
     data->match = false;
     if (!path)
         return 1;
     path_len = strncpy_from_user_nofault(data->path, path, sizeof(data->path));
-    if (path_len <= 0)
+    if (path_len < 0)
         return 1;
     if (path_len >= (long)sizeof(data->path))
         return 1;
     data->path[sizeof(data->path) - 1] = '\0';
-    if (!ksu_match_stealth_proc_path(data->path))
+
+    if (data->path[0] != '/') {
+        if (!ksu_resolve_proc_path_at(dfd, data->path, resolved_path,
+                                      sizeof(resolved_path)))
+            return 1;
+        path_to_match = resolved_path;
+    }
+
+    if (!ksu_match_stealth_proc_path(path_to_match))
         return 1;
     data->match = true;
     return 0;
@@ -605,7 +744,7 @@ static int pidfd_entry_handler(struct kretprobe_instance *ri,
 
     data->match = false;
     data->pid = pid;
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return 1;
     if (pid <= 0)
         return 1;
@@ -636,7 +775,7 @@ static int kill_entry_handler(struct kretprobe_instance *ri,
 
     data->match = false;
     data->pid = pid;
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return 1;
     if (pid <= 0)
         return 1;
@@ -656,7 +795,7 @@ static int tgkill_entry_handler(struct kretprobe_instance *ri,
 
     data->match = false;
     data->pid = tid;
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return 1;
     if ((tid > 0 && ksu_is_stealth_pid(tid)) ||
         (tgid > 0 && ksu_is_stealth_pid(tgid))) {
@@ -675,7 +814,7 @@ static int tkill_entry_handler(struct kretprobe_instance *ri,
 
     data->match = false;
     data->pid = tid;
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return 1;
     if (tid <= 0)
         return 1;
@@ -746,7 +885,7 @@ static bool match_proc_link(const char *path, pid_t *pid_out, int *kind_out)
 		has_pid = true;
 	} else if (!strncmp(p, "thread-self", 11) &&
 		   (p[11] == '/' || p[11] == '\0')) {
-		pid = current->tgid;
+		pid = current->pid;
 		p += 11;
 		has_pid = true;
 	} else {
@@ -755,6 +894,8 @@ static bool match_proc_link(const char *path, pid_t *pid_out, int *kind_out)
 			p++;
 		}
 		if (pid <= 0)
+			return false;
+		if (*p != '\0' && *p != '/')
 			return false;
 		has_pid = true;
 	}
@@ -769,6 +910,7 @@ static bool match_proc_link(const char *path, pid_t *pid_out, int *kind_out)
 		}
 		if (tid <= 0 || *p != '/')
 			return false;
+		pid = tid;
 		p++; /* skip '/' */
 		tail = p;
 	} else if (*p == '/') {
@@ -873,14 +1015,17 @@ static int readlinkat_entry_handler(struct kretprobe_instance *ri,
 {
     struct readlink_rp_data *data = (struct readlink_rp_data *)ri->data;
     struct pt_regs *real_regs = PT_REAL_REGS(regs);
+    int dfd = (int)PT_REGS_PARM1(real_regs);
     const char __user *path = (const char __user *)PT_REGS_PARM2(real_regs);
+    const char *path_to_match = data->path;
+    char resolved_path[KSU_PROC_PATH_BUFSZ];
     long path_len;
     pid_t pid;
 
     data->match = false;
     data->ns_type[0] = '\0';
     data->fd_num = -1;
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return 1;
     if (!path)
         return 1;
@@ -891,9 +1036,19 @@ static int readlinkat_entry_handler(struct kretprobe_instance *ri,
         return 1;
     data->path[sizeof(data->path) - 1] = '\0';
 
-    if (!match_proc_link(data->path, &pid, &data->kind))
+    if (data->path[0] != '/') {
+        if (!ksu_resolve_proc_path_at(dfd, data->path, resolved_path,
+                                      sizeof(resolved_path)))
+            return 1;
+        path_to_match = resolved_path;
+    }
+
+    if (!match_proc_link(path_to_match, &pid, &data->kind))
         return 1;
     if (!ksu_is_stealth_pid(pid))
+        return 1;
+    if (path_to_match != data->path &&
+        strscpy(data->path, path_to_match, sizeof(data->path)) < 0)
         return 1;
     if (data->kind == PROC_LINK_NS)
         fill_ns_type(data);
@@ -918,7 +1073,7 @@ static int readlink_entry_handler(struct kretprobe_instance *ri,
     data->match = false;
     data->ns_type[0] = '\0';
     data->fd_num = -1;
-    if (!ksu_should_hide_proc_general())
+    if (!ksu_should_hide_stealth_pid_access())
         return 1;
     if (!path)
         return 1;
@@ -1150,7 +1305,7 @@ static struct kretprobe readlinkat_rp = {
     .maxactive = 32,
 };
 
-/* Feature handler for global stealth filter enable/disable */
+/* Feature handler for syscall-level I/O stat/lock filtering. */
 static int stealth_filter_get(u64 *value)
 {
     *value = (u64)atomic_read(&stealth_filter_enabled);

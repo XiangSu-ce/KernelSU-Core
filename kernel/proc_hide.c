@@ -53,7 +53,7 @@ static bool path_eq_or_subpath(const char *path, const char *base)
 		return false;
 	n = strlen(base);
 	return strncmp(path, base, n) == 0 &&
-	       (path[n] == '\0' || (path[n] == '/' && path[n + 1] == '\0'));
+	       (path[n] == '\0' || path[n] == '/');
 }
 
 static bool path_component_match(const char *path, const char *component)
@@ -1037,7 +1037,7 @@ int ksu_should_filter_proc_extra(const char *path, pid_t *out_pid)
 		has_pid = true;
 	} else if (!strncmp(p, "thread-self", 11) &&
 		   (p[11] == '/' || p[11] == '\0')) {
-		pid = current->tgid;
+		pid = current->pid;
 		p += 11;
 		is_task = true;
 		has_pid = true;
@@ -1048,14 +1048,11 @@ int ksu_should_filter_proc_extra(const char *path, pid_t *out_pid)
 		}
 		if (pid <= 0)
 			return KSU_FILTER_NONE;
+		if (*p != '\0' && *p != '/')
+			return KSU_FILTER_NONE;
 		has_pid = true;
 	}
 
-	if (!has_pid || !ksu_is_stealth_pid(pid))
-		return KSU_FILTER_NONE;
-
-	if (out_pid)
-		*out_pid = pid;
 	/* Support /proc/<pid>/task/<tid>/... */
 	if (!strncmp(p, "/task/", 6)) {
 		p += 6;
@@ -1066,9 +1063,16 @@ int ksu_should_filter_proc_extra(const char *path, pid_t *out_pid)
 		}
 		if (tid <= 0 || *p != '/')
 			return KSU_FILTER_NONE;
+		pid = tid;
 		is_task = true;
 		/* p already points at '/' of the tail */
 	}
+
+	if (!has_pid || !ksu_is_stealth_pid(pid))
+		return KSU_FILTER_NONE;
+
+	if (out_pid)
+		*out_pid = pid;
 
 	if (strcmp(p, "/wchan") == 0)
 		return KSU_FILTER_WCHAN;
@@ -1207,21 +1211,37 @@ static int getdents_entry_handler(struct kretprobe_instance *ri,
 		} else if (strncmp(res, "/proc/", 6) == 0) {
 			const char *q = res + 6;
 			pid_t pid = 0;
+			pid_t target_pid = 0;
 			if (!strncmp(q, "self", 4) &&
 			    (q[4] == '\0' || q[4] == '/')) {
 				pid = current->tgid;
 				q += 4;
 			} else if (!strncmp(q, "thread-self", 11) &&
 				   (q[11] == '\0' || q[11] == '/')) {
-				pid = current->tgid;
+				pid = current->pid;
 				q += 11;
 			} else {
 				while (*q >= '0' && *q <= '9' && pid < 10000000) {
 					pid = pid * 10 + (*q - '0');
 					q++;
 				}
+				if (*q != '\0' && *q != '/')
+					pid = 0;
 			}
-			if (pid > 0 && ksu_is_stealth_pid(pid)) {
+			target_pid = pid;
+			if (!strncmp(q, "/task/", 6) &&
+			    q[6] >= '0' && q[6] <= '9') {
+				const char *r = q + 6;
+				pid_t tid = 0;
+				while (*r >= '0' && *r <= '9' && tid < 10000000) {
+					tid = tid * 10 + (*r - '0');
+					r++;
+				}
+				if (tid > 0 && (*r == '\0' || *r == '/')) {
+					target_pid = tid;
+				}
+			}
+			if (target_pid > 0 && ksu_is_stealth_pid(target_pid)) {
 				/* Hide /proc/<pid>/task/<tid> listings */
 				if (!strncmp(q, "/task/", 6) &&
 				    q[6] >= '0' && q[6] <= '9') {

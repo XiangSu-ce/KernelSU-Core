@@ -117,7 +117,7 @@ import dawang.KernelSU.Core.ui.component.rememberConfirmDialog
 import dawang.KernelSU.Core.ui.component.rememberLoadingDialog
 import dawang.KernelSU.Core.ui.navigation3.Navigator
 import dawang.KernelSU.Core.ui.navigation3.Route
-import dawang.KernelSU.Core.ui.theme.RazerColors
+import dawang.KernelSU.Core.ui.theme.CoreColors
 import dawang.KernelSU.Core.ui.theme.isInDarkTheme
 import dawang.KernelSU.Core.ui.util.DownloadListener
 import dawang.KernelSU.Core.ui.util.download
@@ -678,9 +678,9 @@ fun ModulePager(
                     modifier = Modifier
                         .offset(y = offsetHeight)
                         .padding(bottom = bottomInnerPadding + 20.dp, end = 20.dp)
-                        .border(0.05.dp, RazerColors.Green.copy(alpha = 0.5f), CircleShape),
+                        .border(0.05.dp, CoreColors.Green.copy(alpha = 0.5f), CircleShape),
                     shadowElevation = 0.dp,
-                    containerColor = RazerColors.Green,
+                    containerColor = CoreColors.Green,
                     onClick = {
                         // Select the zip files to install
                         val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -694,7 +694,7 @@ fun ModulePager(
                             Icons.Rounded.Add,
                             moduleInstall,
                             modifier = Modifier.size(24.dp),
-                            tint = Color.Black
+                            tint = CoreColors.Black
                         )
                     },
                 )
@@ -1220,8 +1220,8 @@ fun ModuleItem(
     val isDark = isInDarkTheme(prefs.getInt("color_mode", 0))
     val secondaryContainer = colorScheme.secondaryContainer.copy(alpha = 0.8f)
     val actionIconTint = colorScheme.onSurface.copy(alpha = if (isDark) 0.7f else 0.9f)
-    val updateBg = RazerColors.Green.copy(alpha = 0.10f)
-    val updateTint = RazerColors.Green
+    val updateBg = CoreColors.Green.copy(alpha = 0.10f)
+    val updateTint = CoreColors.Green
     val hasUpdate by remember(updateUrl) { derivedStateOf { updateUrl.isNotEmpty() } }
     val textDecoration by remember(module.remove) {
         mutableStateOf(if (module.remove) TextDecoration.LineThrough else null)

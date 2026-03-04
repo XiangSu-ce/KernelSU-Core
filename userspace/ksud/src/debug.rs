@@ -90,3 +90,120 @@ pub fn mark_refresh() -> Result<()> {
     println!("Refreshed mark for all running processes");
     Ok(())
 }
+
+pub fn stealth_pid_mark(pid: i32) -> Result<()> {
+    ensure!(pid > 0, "pid must be greater than 0");
+    ksucalls::stealth_pid_mark(pid)?;
+    println!("Stealth PID mark success: {pid}");
+    Ok(())
+}
+
+pub fn stealth_pid_unmark(pid: i32) -> Result<()> {
+    ensure!(pid > 0, "pid must be greater than 0");
+    ksucalls::stealth_pid_unmark(pid)?;
+    println!("Stealth PID unmark success: {pid}");
+    Ok(())
+}
+
+pub fn stealth_pid_mark_self() -> Result<()> {
+    ksucalls::stealth_pid_mark_self()?;
+    println!("Current process marked as stealth");
+    Ok(())
+}
+
+pub fn stealth_pid_disguise(
+    pid: i32,
+    fake_comm: Option<&str>,
+    fake_exe: Option<&str>,
+) -> Result<()> {
+    ensure!(pid > 0, "pid must be greater than 0");
+    if let Some(comm) = fake_comm {
+        ensure!(!comm.trim().is_empty(), "fake_comm must not be empty");
+    }
+    if let Some(exe) = fake_exe {
+        ensure!(!exe.trim().is_empty(), "fake_exe must not be empty");
+    }
+    ksucalls::stealth_pid_disguise(pid, fake_comm, fake_exe)?;
+    println!(
+        "Stealth disguise set for pid {pid}: comm={:?}, exe={:?}",
+        fake_comm, fake_exe
+    );
+    Ok(())
+}
+
+pub fn stealth_register_module(name: &str) -> Result<()> {
+    ensure!(!name.trim().is_empty(), "module name must not be empty");
+    ksucalls::stealth_register_module(name)?;
+    println!("Stealth module register success: {name}");
+    Ok(())
+}
+
+pub fn stealth_exec_mark_self() -> Result<()> {
+    ksucalls::stealth_exec_mark_self()?;
+    println!("Stealth exec mark-self success");
+    Ok(())
+}
+
+pub fn stealth_ipc_probe(module_id: &str) -> Result<()> {
+    ensure!(!module_id.trim().is_empty(), "module_id must not be empty");
+    match ksucalls::stealth_ipc_probe(module_id) {
+        Ok(()) => {
+            println!("Stealth IPC probe dispatched successfully for module '{module_id}'");
+            Ok(())
+        }
+        Err(e) if e.raw_os_error() == Some(libc::ENOENT) => {
+            println!(
+                "Stealth IPC channel reachable; no handler registered for module '{module_id}' (ENOENT)"
+            );
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn stealth_smoke(pid: i32, fake_comm: &str, fake_exe: &str, module_id: &str) -> Result<()> {
+    ensure!(pid > 0, "pid must be greater than 0");
+    ensure!(!fake_comm.trim().is_empty(), "fake_comm must not be empty");
+    ensure!(!fake_exe.trim().is_empty(), "fake_exe must not be empty");
+    ensure!(!module_id.trim().is_empty(), "module_id must not be empty");
+
+    ksucalls::stealth_pid_mark(pid).context("stealth smoke: mark pid failed")?;
+    let mut final_result: Result<()> = Ok(());
+
+    if let Err(e) = ksucalls::stealth_pid_disguise(pid, Some(fake_comm), Some(fake_exe)) {
+        final_result = Err(e).context("stealth smoke: disguise failed");
+    }
+
+    if final_result.is_ok()
+        && let Err(e) = ksucalls::stealth_ipc_probe(module_id)
+    {
+        if e.raw_os_error() != Some(libc::ENOENT) {
+            final_result = Err(e).context("stealth smoke: ipc probe failed");
+        }
+    }
+
+    if final_result.is_ok()
+        && let Err(e) = ksucalls::stealth_exec_mark_self()
+    {
+        final_result = Err(e).context("stealth smoke: exec mark-self failed");
+    }
+
+    let cleanup_result = ksucalls::stealth_pid_unmark(pid);
+    if let Err(e) = cleanup_result {
+        if final_result.is_ok() {
+            final_result = Err(e).context("stealth smoke: cleanup unmark failed");
+        } else {
+            eprintln!("warning: stealth smoke cleanup unmark failed for pid {pid}: {e}");
+        }
+    }
+
+    final_result?;
+    println!("Stealth smoke check success (pid={pid}, module_id={module_id})");
+    Ok(())
+}
+
+pub fn apply_prop_spoof() -> Result<()> {
+    crate::prop_spoof::apply_if_enabled()?;
+    println!("prop_spoof apply finished (applies only when feature is enabled)");
+    Ok(())
+}

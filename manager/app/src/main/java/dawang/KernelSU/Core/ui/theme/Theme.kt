@@ -16,9 +16,9 @@ fun KernelSUTheme(
     content: @Composable () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
-    // 浅色模式默认淡粉色种子，用户选了强调色则优先用户的
-    val softPink = Color(0xFFFFB5C5)
-    val lightKey = keyColor ?: softPink
+    // 浅色模式默认使用品牌深青种子，用户自定义强调色优先
+    val defaultLightKey = Color(0xFF0F8F7A)
+    val lightKey = keyColor ?: defaultLightKey
     val controller = when (colorMode) {
         1 -> ThemeController(ColorSchemeMode.MonetLight, keyColor = lightKey)
         2 -> ThemeController(ColorSchemeMode.Dark)

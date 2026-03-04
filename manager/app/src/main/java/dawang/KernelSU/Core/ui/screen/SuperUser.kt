@@ -78,7 +78,7 @@ import dawang.KernelSU.Core.ui.component.SearchPager
 import dawang.KernelSU.Core.ui.navigation3.Navigator
 import dawang.KernelSU.Core.ui.navigation3.Route
 import dawang.KernelSU.Core.ui.theme.isInDarkTheme
-import dawang.KernelSU.Core.ui.theme.RazerColors
+import dawang.KernelSU.Core.ui.theme.CoreColors
 import dawang.KernelSU.Core.ui.util.ownerNameForUid
 import dawang.KernelSU.Core.ui.util.pickPrimary
 import dawang.KernelSU.Core.ui.viewmodel.SuperUserViewModel
@@ -490,10 +490,10 @@ private fun GroupItem(
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     val isDark = isInDarkTheme(prefs.getInt("color_mode", 0))
     val bg = colorScheme.secondaryContainer.copy(alpha = 0.8f)
-    val rootBg = RazerColors.Green.copy(alpha = 0.10f)
+    val rootBg = CoreColors.Green.copy(alpha = 0.10f)
     val unmountBg = if (isDark) Color.White.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.3f)
     val fg = colorScheme.onSecondaryContainer
-    val rootFg = RazerColors.Green
+    val rootFg = CoreColors.Green
     val unmountFg = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.8f)
 
     val userId = group.uid / 100000

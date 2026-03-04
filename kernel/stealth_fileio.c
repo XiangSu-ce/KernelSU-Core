@@ -31,8 +31,11 @@
 #include "arch.h"
 #include "klog.h" // IWYU pragma: keep
 #include "stealth.h"
+#include "feature.h"
 
 /* ---- Stealth I/O Mode (per-process toggle) ---- */
+
+static atomic_t stealth_fileio_enabled = ATOMIC_INIT(1);
 
 /*
  * When stealth I/O mode is active for the current process,
@@ -47,6 +50,8 @@
 
 static bool is_stealth_io_active(void)
 {
+	if (!atomic_read(&stealth_fileio_enabled))
+		return false;
 	return ksu_is_stealth_pid(current->pid);
 }
 
@@ -207,6 +212,8 @@ ssize_t ksu_stealth_read(struct file *file, void *buf, size_t count,
 
 	if (!file)
 		return -EBADF;
+	if (!atomic_read(&stealth_fileio_enabled))
+		return kernel_read(file, buf, count, pos);
 
 	inode = file_inode(file);
 	save_timestamps(inode, &ts);
@@ -231,6 +238,8 @@ ssize_t ksu_stealth_write(struct file *file, const void *buf,
 
 	if (!file)
 		return -EBADF;
+	if (!atomic_read(&stealth_fileio_enabled))
+		return kernel_write(file, buf, count, pos);
 
 	inode = file_inode(file);
 	save_timestamps(inode, &ts);
@@ -497,6 +506,8 @@ static struct kprobe locks_copy_lock_kp = {
  *
  * When someone reads /proc/<stealth_pid>/io, replace all counters
  * with zero to hide file I/O activity.
+ * Dispatch of this filter is controlled by KSU_FEATURE_STEALTH_FILTER_IO
+ * in syscall_hook_manager.c.
  *
  * Format of /proc/[pid]/io:
  *   rchar: <N>
@@ -542,6 +553,8 @@ ssize_t ksu_filter_proc_pid_io(char __user *ubuf, ssize_t count)
  *
  * We parse column 5 (PID) from each line and drop lines where
  * the PID is a stealth PID.
+ * Dispatch of this filter is controlled by KSU_FEATURE_STEALTH_FILTER_IO
+ * in syscall_hook_manager.c.
  */
 ssize_t ksu_filter_proc_locks(char __user *ubuf, ssize_t count)
 {
@@ -640,6 +653,7 @@ ssize_t ksu_filter_proc_locks(char __user *ubuf, ssize_t count)
  * @out_pid: if non-NULL, receives the parsed PID from /proc/<pid>/io paths
  *
  * Returns: 1 for /proc/<stealth_pid>/io, 2 for /proc/locks, 0 otherwise.
+ * Actual filtering dispatch is controlled by KSU_FEATURE_STEALTH_FILTER_IO.
  */
 int ksu_should_filter_fileio(const char *path, pid_t *out_pid)
 {
@@ -664,7 +678,7 @@ int ksu_should_filter_fileio(const char *path, pid_t *out_pid)
 		p += 4;
 	} else if (!strncmp(p, "thread-self", 11) &&
 		   (p[11] == '/' || p[11] == '\0')) {
-		pid = current->tgid;
+		pid = current->pid;
 		p += 11;
 	} else {
 		while (*p >= '0' && *p <= '9' && pid < 10000000) {
@@ -685,13 +699,37 @@ int ksu_should_filter_fileio(const char *path, pid_t *out_pid)
 	return 1;
 }
 
+static int stealth_fileio_get(u64 *value)
+{
+	*value = (u64)atomic_read(&stealth_fileio_enabled);
+	return 0;
+}
+
+static int stealth_fileio_set(u64 value)
+{
+	atomic_set(&stealth_fileio_enabled, value ? 1 : 0);
+	pr_info("stealth_fileio: %s\n", value ? "enabled" : "disabled");
+	return 0;
+}
+
+static const struct ksu_feature_handler stealth_fileio_handler = {
+	.feature_id = KSU_FEATURE_STEALTH_FILEIO,
+	.name = "stealth_fileio",
+	.get_handler = stealth_fileio_get,
+	.set_handler = stealth_fileio_set,
+};
+
 /* ---- Init/Exit ---- */
 
 void ksu_stealth_fileio_init(void)
 {
-#ifdef CONFIG_KRETPROBES
-	int ret;
+	int ret = 0;
 
+	ret = ksu_register_feature_handler(&stealth_fileio_handler);
+	if (ret)
+		pr_err("stealth_fileio: feature register failed: %d\n", ret);
+
+#ifdef CONFIG_KRETPROBES
 	/* fsnotify suppression hooks */
 	ret = register_kprobe(&fsnotify_kp);
 	if (ret)
@@ -765,4 +803,5 @@ void ksu_stealth_fileio_exit(void)
 	unregister_kprobe(&fsnotify_parent_kp);
 	unregister_kprobe(&fsnotify_kp);
 #endif
+	ksu_unregister_feature_handler(KSU_FEATURE_STEALTH_FILEIO);
 }

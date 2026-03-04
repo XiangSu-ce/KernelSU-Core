@@ -70,7 +70,7 @@ import dawang.KernelSU.Core.ui.component.RebootListPopup
 import dawang.KernelSU.Core.ui.component.rememberConfirmDialog
 import dawang.KernelSU.Core.ui.navigation3.Navigator
 import dawang.KernelSU.Core.ui.navigation3.Route
-import dawang.KernelSU.Core.ui.theme.RazerColors
+import dawang.KernelSU.Core.ui.theme.CoreColors
 import dawang.KernelSU.Core.ui.theme.isInDarkTheme
 import dawang.KernelSU.Core.ui.util.checkNewVersion
 import dawang.KernelSU.Core.ui.util.getModuleCount
@@ -129,7 +129,7 @@ fun HomePager(
     val checkUpdate = prefs.getBoolean("check_update", true)
     val themeMode = prefs.getInt("color_mode", 0)
     val isDark = isInDarkTheme(themeMode)
-    val pageBg = if (isDark) colorScheme.surface else RazerColors.PinkBg
+    val pageBg = if (isDark) colorScheme.surface else CoreColors.BgBase
 
     val hazeStyle = HazeStyle(
         backgroundColor = pageBg,
@@ -360,14 +360,14 @@ private fun StatusCard(
                             .background(
                                 brush = androidx.compose.ui.graphics.Brush.linearGradient(
                                     colors = listOf(
-                                        RazerColors.Green.copy(alpha = 0.10f),
-                                        RazerColors.Green.copy(alpha = 0.02f)
+                                        CoreColors.Green.copy(alpha = 0.10f),
+                                        CoreColors.Green.copy(alpha = 0.02f)
                                     )
                                 )
                             )
                             .border(
                                 width = 1.dp,
-                                color = RazerColors.GreenBorder,
+                                color = CoreColors.GreenBorder,
                                 shape = RoundedCornerShape(16.dp)
                             )
                     ) {
@@ -381,7 +381,7 @@ private fun StatusCard(
                             Icon(
                                 modifier = Modifier.size(120.dp),
                                 imageVector = Icons.Rounded.CheckCircleOutline,
-                                tint = RazerColors.Green.copy(alpha = 0.08f),
+                                tint = CoreColors.Green.copy(alpha = 0.08f),
                                 contentDescription = null
                             )
                         }
@@ -395,10 +395,10 @@ private fun StatusCard(
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(RazerColors.Green.copy(alpha = 0.12f))
+                                    .background(CoreColors.Green.copy(alpha = 0.12f))
                                     .border(
                                         width = 1.dp,
-                                        color = RazerColors.Green.copy(alpha = 0.3f),
+                                        color = CoreColors.Green.copy(alpha = 0.3f),
                                         shape = RoundedCornerShape(8.dp)
                                     )
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
@@ -410,13 +410,13 @@ private fun StatusCard(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(RoundedCornerShape(4.dp))
-                                        .background(RazerColors.Green)
+                                        .background(CoreColors.Green)
                                 )
                                 Text(
                                     text = stringResource(R.string.home_running),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = RazerColors.Green
+                                    color = CoreColors.Green
                                 )
                             }
                             Spacer(Modifier.height(12.dp))
@@ -432,7 +432,7 @@ private fun StatusCard(
                                     text = workingMode,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Normal,
-                                    color = RazerColors.Green
+                                    color = CoreColors.Green
                                 )
                             }
                             Spacer(Modifier.height(2.dp))
@@ -462,7 +462,7 @@ private fun StatusCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f),
-                            colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else RazerColors.PinkElevated),
+                            colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else CoreColors.BgElevated),
                             insideMargin = PaddingValues(16.dp),
                             onClick = { onClickSuperuser() },
                             showIndication = true,
@@ -482,7 +482,7 @@ private fun StatusCard(
                                     text = getSuperuserCount().toString(),
                                     fontSize = 30.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = RazerColors.Green,
+                                    color = CoreColors.Green,
                                     letterSpacing = (-1).sp
                                 )
                             }
@@ -492,7 +492,7 @@ private fun StatusCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f),
-                            colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else RazerColors.PinkElevated),
+                            colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else CoreColors.BgElevated),
                             insideMargin = PaddingValues(16.dp),
                             onClick = { onclickModule() },
                             showIndication = true,
@@ -512,7 +512,7 @@ private fun StatusCard(
                                     text = getModuleCount().toString(),
                                     fontSize = 30.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = RazerColors.Green,
+                                    color = CoreColors.Green,
                                     letterSpacing = (-1).sp
                                 )
                             }
@@ -525,7 +525,7 @@ private fun StatusCard(
                 // 未安装状态 - 点击跳转到安装页面
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else RazerColors.PinkCard),
+                    colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else CoreColors.BgCard),
                     onClick = { onClickInstall() },
                     showIndication = true,
                     pressFeedbackType = PressFeedbackType.Tilt
@@ -570,14 +570,14 @@ private fun StatusCard(
                                     colorScheme.primary.copy(alpha = 0.10f),
                                     colorScheme.primary.copy(alpha = 0.03f)
                                 ) else listOf(
-                                    RazerColors.PinkCard,
-                                    RazerColors.PinkCard
+                                    CoreColors.BgCard,
+                                    CoreColors.BgCard
                                 )
                             )
                         )
                         .border(
                             width = 1.dp,
-                            color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else RazerColors.PinkBorder,
+                            color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else CoreColors.Border,
                             shape = RoundedCornerShape(16.dp)
                         )
                         .padding(16.dp)
@@ -590,7 +590,7 @@ private fun StatusCard(
                             Icons.Rounded.ErrorOutline,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
-                            tint = RazerColors.Danger
+                            tint = CoreColors.Danger
                         )
                         Column {
                             Text(
@@ -619,15 +619,15 @@ fun WarningCard(
     color: Color? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    // 使用 Razer 风格的警告卡片
+    // 使用统一品牌风格的警告卡片
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(RazerColors.DangerBg)
+            .background(CoreColors.DangerBg)
             .border(
                 width = 1.dp,
-                color = RazerColors.DangerBorder,
+                color = CoreColors.DangerBorder,
                 shape = RoundedCornerShape(16.dp)
             )
             .then(
@@ -649,11 +649,11 @@ fun WarningCard(
                 imageVector = Icons.Rounded.ErrorOutline,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = RazerColors.Danger
+                tint = CoreColors.Danger
             )
             Text(
                 text = message,
-                color = Color(0xFFFF6B6B),
+                color = CoreColors.Danger,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 lineHeight = 18.sp
@@ -669,7 +669,7 @@ fun LearnMoreCard(isDark: Boolean = true) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else RazerColors.PinkCard),
+        colors = CardDefaults.defaultColors(color = if (isDark) colorScheme.primaryContainer else CoreColors.BgCard),
         onClick = { uriHandler.openUri(url) },
         showIndication = true,
         pressFeedbackType = PressFeedbackType.Tilt
@@ -686,7 +686,7 @@ fun LearnMoreCard(isDark: Boolean = true) {
                     text = stringResource(R.string.home_learn_kernelsu),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = RazerColors.Green
+                    color = CoreColors.Green
                 )
                 Text(
                     text = stringResource(R.string.home_click_to_learn_kernelsu),
@@ -697,7 +697,7 @@ fun LearnMoreCard(isDark: Boolean = true) {
             }
             Icon(
                 imageVector = MiuixIcons.Link,
-                tint = RazerColors.Green,
+                tint = CoreColors.Green,
                 contentDescription = null
             )
         }
@@ -719,14 +719,14 @@ fun LkmGuideCard(isDark: Boolean = true) {
                         colorScheme.primary.copy(alpha = 0.12f),
                         colorScheme.primary.copy(alpha = 0.03f)
                     ) else listOf(
-                        RazerColors.PinkCard,
-                        RazerColors.PinkCard
+                        CoreColors.BgCard,
+                        CoreColors.BgCard
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else RazerColors.PinkBorder,
+                color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else CoreColors.Border,
                 shape = RoundedCornerShape(16.dp)
             )
     ) {
@@ -735,7 +735,7 @@ fun LkmGuideCard(isDark: Boolean = true) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(2.dp)
-                .background(RazerColors.Green)
+                .background(CoreColors.Green)
         )
         Column(
             modifier = Modifier.padding(14.dp),
@@ -745,7 +745,7 @@ fun LkmGuideCard(isDark: Boolean = true) {
                 text = stringResource(R.string.home_lkm_guide_title),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = RazerColors.Green
+                color = CoreColors.Green
             )
             Text(
                 text = stringResource(R.string.home_lkm_guide_desc),
@@ -789,7 +789,7 @@ fun LkmGuideCard(isDark: Boolean = true) {
                     .fillMaxWidth()
                     .padding(top = 4.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(RazerColors.Green.copy(alpha = 0.10f))
+                    .background(CoreColors.Green.copy(alpha = 0.10f))
                     .clickable { uriHandler.openUri(url) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -799,11 +799,11 @@ fun LkmGuideCard(isDark: Boolean = true) {
                     text = stringResource(R.string.home_lkm_guide_action),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = RazerColors.Green
+                    color = CoreColors.Green
                 )
                 Icon(
                     imageVector = MiuixIcons.Link,
-                    tint = RazerColors.Green,
+                    tint = CoreColors.Green,
                     contentDescription = null
                 )
             }
@@ -827,14 +827,14 @@ fun DonateCard(isDark: Boolean = true) {
                         colorScheme.primary.copy(alpha = 0.12f),
                         colorScheme.primary.copy(alpha = 0.03f)
                     ) else listOf(
-                        RazerColors.PinkCard,
-                        RazerColors.PinkCard
+                        CoreColors.BgCard,
+                        CoreColors.BgCard
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else RazerColors.PinkBorder,
+                color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else CoreColors.Border,
                 shape = RoundedCornerShape(16.dp)
             )
             .clickable { uriHandler.openUri(qqGroupUrl) }
@@ -844,7 +844,7 @@ fun DonateCard(isDark: Boolean = true) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(2.dp)
-                .background(RazerColors.Green)
+                .background(CoreColors.Green)
         )
         Row(
             modifier = Modifier
@@ -858,7 +858,7 @@ fun DonateCard(isDark: Boolean = true) {
                     text = stringResource(R.string.home_support_title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = RazerColors.Green
+                    color = CoreColors.Green
                 )
                 Text(
                     text = "QQ群: 325900535 · 点击加入",
@@ -869,7 +869,7 @@ fun DonateCard(isDark: Boolean = true) {
             }
             Icon(
                 imageVector = MiuixIcons.Link,
-                tint = RazerColors.Green,
+                tint = CoreColors.Green,
                 contentDescription = null
             )
         }
@@ -883,7 +883,7 @@ private fun InfoCard(isDark: Boolean = true) {
     val managerVersion = getManagerVersion(context)
     val selinuxStatus = getSELinuxStatus()
 
-    // 使用 Razer 风格的信息卡片 - 绿色顶部边框 (card-accent)
+    // 使用统一品牌风格的信息卡片 - 强调色顶部边框 (card-accent)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -894,14 +894,14 @@ private fun InfoCard(isDark: Boolean = true) {
                         colorScheme.primary.copy(alpha = 0.12f),
                         colorScheme.primary.copy(alpha = 0.03f)
                     ) else listOf(
-                        RazerColors.PinkCard,
-                        RazerColors.PinkCard
+                        CoreColors.BgCard,
+                        CoreColors.BgCard
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else RazerColors.PinkBorder,
+                color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else CoreColors.Border,
                 shape = RoundedCornerShape(16.dp)
             )
     ) {
@@ -910,7 +910,7 @@ private fun InfoCard(isDark: Boolean = true) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(2.dp)
-                .background(RazerColors.Green)
+                .background(CoreColors.Green)
         )
         // 信息行
         InfoRow(
@@ -961,12 +961,12 @@ private fun InfoRow(
                 text = label,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = RazerColors.Green
+                color = CoreColors.Green
             )
             Text(
                 text = value,
                 fontSize = 13.sp,
-                color = if (isAccent) RazerColors.Green else colorScheme.outline,
+                color = if (isAccent) CoreColors.Green else colorScheme.outline,
                 fontWeight = if (isAccent) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f, fill = false).padding(start = 16.dp),
@@ -979,7 +979,7 @@ private fun InfoRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(if (isDark) colorScheme.primary.copy(alpha = 0.12f) else RazerColors.PinkBorder)
+                    .background(if (isDark) colorScheme.primary.copy(alpha = 0.12f) else CoreColors.Border)
             )
         }
     }
@@ -998,17 +998,17 @@ fun CeManagerCard(isDark: Boolean = true) {
             .background(
                 brush = androidx.compose.ui.graphics.Brush.linearGradient(
                     colors = if (isDark) listOf(
-                        RazerColors.Green.copy(alpha = 0.06f),
+                        CoreColors.Green.copy(alpha = 0.06f),
                         colorScheme.primaryContainer
                     ) else listOf(
-                        RazerColors.Green.copy(alpha = 0.06f),
-                        RazerColors.PinkCard
+                        CoreColors.Green.copy(alpha = 0.06f),
+                        CoreColors.BgCard
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                color = if (isDark) RazerColors.GreenBorder else RazerColors.PinkBorder,
+                color = if (isDark) CoreColors.GreenBorder else CoreColors.Border,
                 shape = RoundedCornerShape(16.dp)
             )
     ) {
@@ -1024,14 +1024,14 @@ fun CeManagerCard(isDark: Boolean = true) {
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(RazerColors.Green),
+                        .background(CoreColors.Green),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "CE",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color.Black
+                        color = CoreColors.Black
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -1039,7 +1039,7 @@ fun CeManagerCard(isDark: Boolean = true) {
                         text = stringResource(R.string.ce_manager_title),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = RazerColors.Green
+                        color = CoreColors.Green
                     )
                     Text(
                         text = stringResource(R.string.ce_manager_version),
@@ -1049,7 +1049,7 @@ fun CeManagerCard(isDark: Boolean = true) {
                 }
                 Icon(
                     imageVector = MiuixIcons.Link,
-                    tint = RazerColors.GreenDim,
+                    tint = CoreColors.GreenDim,
                     contentDescription = null
                 )
             }
@@ -1082,10 +1082,10 @@ fun CeManagerCard(isDark: Boolean = true) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(RazerColors.GreenBg)
+                                .background(CoreColors.GreenBg)
                                 .border(
                                     width = 1.dp,
-                                    color = RazerColors.Green.copy(alpha = 0.12f),
+                                    color = CoreColors.Green.copy(alpha = 0.12f),
                                     shape = RoundedCornerShape(6.dp)
                                 )
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -1094,7 +1094,7 @@ fun CeManagerCard(isDark: Boolean = true) {
                                 text = stringResource(tagRes),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = RazerColors.GreenDim
+                                color = CoreColors.GreenDim
                             )
                         }
                     }
@@ -1107,7 +1107,7 @@ fun CeManagerCard(isDark: Boolean = true) {
                     .fillMaxWidth()
                     .padding(16.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(RazerColors.Green)
+                    .background(CoreColors.Green)
                     .clickable { uriHandler.openUri(ceUrl) }
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
@@ -1118,7 +1118,7 @@ fun CeManagerCard(isDark: Boolean = true) {
                 ) {
                     Icon(
                         imageVector = MiuixIcons.Link,
-                        tint = Color.Black,
+                        tint = CoreColors.Black,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
@@ -1126,7 +1126,7 @@ fun CeManagerCard(isDark: Boolean = true) {
                         text = stringResource(R.string.ce_manager_download),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = CoreColors.Black
                     )
                 }
             }
@@ -1157,7 +1157,7 @@ private fun GlowingAboutButton(onClick: () -> Unit) {
         ),
         label = "glowAlpha"
     )
-    val glowColor = RazerColors.Green
+    val glowColor = CoreColors.Green
 
     Box(
         modifier = Modifier
@@ -1194,10 +1194,10 @@ private fun GlowingAboutButton(onClick: () -> Unit) {
 
 @Composable
 private fun AboutDialog(isDark: Boolean, onDismiss: () -> Unit) {
-    val dialogBg = if (isDark) colorScheme.surfaceContainer else RazerColors.PinkCard
+    val dialogBg = if (isDark) colorScheme.surfaceContainer else CoreColors.BgCard
     val textSecondary = colorScheme.onSurfaceVariantSummary
     val textDim = colorScheme.outline
-    val accent = RazerColors.Green
+    val accent = CoreColors.Green
     val scrollState = rememberScrollState()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1208,7 +1208,7 @@ private fun AboutDialog(isDark: Boolean, onDismiss: () -> Unit) {
                 .background(dialogBg)
                 .border(
                     width = 1.dp,
-                    color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else RazerColors.PinkBorder,
+                    color = if (isDark) colorScheme.primary.copy(alpha = 0.15f) else CoreColors.Border,
                     shape = RoundedCornerShape(20.dp)
                 )
         ) {
@@ -1292,14 +1292,14 @@ private fun AboutDialog(isDark: Boolean, onDismiss: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(if (isDark) colorScheme.primary.copy(alpha = 0.12f) else RazerColors.PinkBorder)
+                        .background(if (isDark) colorScheme.primary.copy(alpha = 0.12f) else CoreColors.Border)
                 )
 
                 Text(
                     text = "\u514d\u8d23\u58f0\u660e\uff08\u8ba4\u771f\u8138\uff09",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = RazerColors.Danger
+                    color = CoreColors.Danger
                 )
                 Text(
                     text = "\u672c\u4ea7\u54c1\u57fa\u4e8e KernelSU \u4e8c\u6b21\u5f00\u53d1\uff0c\u95f2\u6687\u4e4b\u4f5c\uff0c\u5f00\u53d1\u5468\u671f\u6574\u6574\u4e00\u5929\u3002\n\n" +
@@ -1326,7 +1326,7 @@ private fun AboutDialog(isDark: Boolean, onDismiss: () -> Unit) {
                         text = "\u77e5\u9053\u4e86",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = CoreColors.Black
                     )
                 }
             }
@@ -1342,7 +1342,7 @@ private fun AboutFeatureItem(title: String, desc: String, isDark: Boolean) {
             .clip(RoundedCornerShape(10.dp))
             .background(
                 if (isDark) colorScheme.primary.copy(alpha = 0.06f)
-                else RazerColors.PinkElevated
+                else CoreColors.BgElevated
             )
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1351,7 +1351,7 @@ private fun AboutFeatureItem(title: String, desc: String, isDark: Boolean) {
             text = title,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            color = RazerColors.Green
+            color = CoreColors.Green
         )
         Text(
             text = desc,
@@ -1361,3 +1361,4 @@ private fun AboutFeatureItem(title: String, desc: String, isDark: Boolean) {
         )
     }
 }
+

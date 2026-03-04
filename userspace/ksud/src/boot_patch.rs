@@ -480,7 +480,7 @@ pub struct BootPatchArgs {
     pub module: Option<PathBuf>,
 
     /// init to be replaced
-    #[arg(short, long, requires("module"))]
+    #[arg(short, long)]
     pub init: Option<PathBuf>,
 
     /// will use another slot when boot image is not specified
@@ -629,9 +629,13 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
 
         let init_file = workdir.join("init");
         if let Some(init) = init {
-            std::fs::copy(init, init_file).context("copy init failed")?;
+            std::fs::copy(init, &init_file).context("copy init failed")?;
         } else {
-            assets::copy_assets_to_file("ksuinit", init_file).context("copy ksuinit failed")?;
+            assets::copy_assets_to_file("ksuinit", &init_file).with_context(|| {
+                "copy ksuinit failed: 'ksuinit' not found in embedded assets. \
+                 Build ksuinit first and place it in userspace/ksud/bin/aarch64/, \
+                 or pass --init <path> to specify the ksuinit binary."
+            })?;
         }
 
         println!("- Unpacking boot image");

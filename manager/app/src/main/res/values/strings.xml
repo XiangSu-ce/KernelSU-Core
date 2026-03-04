@@ -259,6 +259,7 @@
     <string name="stealth_section_trace">Trace Elimination</string>
     <string name="stealth_section_advanced">Advanced Stealth</string>
     <string name="stealth_not_installed_summary">Requires KernelSU Core kernel module (LKM). Install via the Home page first.</string>
+    <string name="stealth_not_authorized_summary">KernelSU Core is installed, but this app is not authorized as Manager. Feature toggles are unavailable.</string>
 
     <string name="stealth_prop_spoof">System Property Correction</string>
     <string name="stealth_prop_spoof_summary">Spoof bootloader/debug-related properties to pass integrity checks.</string>

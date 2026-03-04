@@ -256,6 +256,7 @@
     <string name="stealth_section_trace">痕迹消除</string>
     <string name="stealth_section_advanced">高级隐匿</string>
     <string name="stealth_not_installed_summary">需要安装 KernelSU Core 内核模块（LKM）才能使用，请先在主页完成安装。</string>
+    <string name="stealth_not_authorized_summary">KernelSU Core 已安装，但当前应用未获得管理器授权，无法切换该功能。</string>
 
     <string name="stealth_prop_spoof">系统属性校正</string>
     <string name="stealth_prop_spoof_summary">伪装 Bootloader 及调试相关属性，通过完整性检查。</string>

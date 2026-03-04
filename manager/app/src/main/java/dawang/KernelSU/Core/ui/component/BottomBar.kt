@@ -1,5 +1,6 @@
 package dawang.KernelSU.Core.ui.component
 
+import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.animateDpAsState
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +62,8 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import dawang.KernelSU.Core.R
 import dawang.KernelSU.Core.ui.LocalMainPagerState
-import dawang.KernelSU.Core.ui.theme.RazerColors
+import dawang.KernelSU.Core.ui.theme.CoreColors
+import dawang.KernelSU.Core.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Text
@@ -70,6 +73,10 @@ import kotlin.math.abs
 @Composable
 fun BottomBar(hazeState: HazeState, hazeStyle: HazeStyle) {
     val mainState = LocalMainPagerState.current
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val themeMode = prefs.getInt("color_mode", 0)
+    val navBackground = if (isInDarkTheme(themeMode)) MiuixTheme.colorScheme.surface else CoreColors.BgBase
 
     val item = BottomBarDestination.entries.map { destination ->
         NavigationItem(
@@ -80,7 +87,7 @@ fun BottomBar(hazeState: HazeState, hazeStyle: HazeStyle) {
 
     NavigationBar(
         modifier = Modifier
-            .background(RazerColors.BgBase.copy(alpha = 0.95f))
+            .background(navBackground.copy(alpha = 0.95f))
             .hazeEffect(hazeState) {
                 style = hazeStyle
                 blurRadius = 30.dp
@@ -144,12 +151,12 @@ fun NavigationBar(
 
                 val tint = when {
                     isPressed -> if (isSelected) {
-                        RazerColors.Green.copy(alpha = 0.5f)
+                        CoreColors.Green.copy(alpha = 0.5f)
                     } else {
                         onSurfaceContainerVariantColor.copy(alpha = 0.5f)
                     }
 
-                    isSelected -> RazerColors.Green
+                    isSelected -> CoreColors.Green
 
                     else -> onSurfaceContainerVariantColor
                 }
@@ -177,7 +184,7 @@ fun NavigationBar(
                         modifier = Modifier
                             .size(width = 24.dp, height = 2.dp)
                             .background(
-                                color = if (isSelected) RazerColors.Green else Color.Transparent,
+                                color = if (isSelected) CoreColors.Green else Color.Transparent,
                                 shape = RoundedCornerShape(1.dp)
                             )
                     )

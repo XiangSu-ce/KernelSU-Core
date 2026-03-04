@@ -17,13 +17,51 @@ const FEATURE_VERSION: u32 = 1;
 pub enum FeatureId {
     SuCompat = 0,
     KernelUmount = 1,
+    PropSpoof = 2,
+    ProcHide = 3,
+    DebugDisable = 4,
+    LogSilent = 5,
+    SymbolHide = 6,
+    MountSanitize = 7,
+    StealthFilterIo = 8,
+    StealthModloader = 9,
+    StealthExec = 10,
+    StealthFileio = 11,
+    StealthIpc = 12,
 }
 
 impl FeatureId {
+    pub const ALL: [Self; 13] = [
+        Self::SuCompat,
+        Self::KernelUmount,
+        Self::PropSpoof,
+        Self::ProcHide,
+        Self::DebugDisable,
+        Self::LogSilent,
+        Self::SymbolHide,
+        Self::MountSanitize,
+        Self::StealthFilterIo,
+        Self::StealthModloader,
+        Self::StealthExec,
+        Self::StealthFileio,
+        Self::StealthIpc,
+    ];
+
     pub const fn from_u32(id: u32) -> Option<Self> {
         match id {
             0 => Some(Self::SuCompat),
             1 => Some(Self::KernelUmount),
+            2 => Some(Self::PropSpoof),
+            3 => Some(Self::ProcHide),
+            4 => Some(Self::DebugDisable),
+            5 => Some(Self::LogSilent),
+            6 => Some(Self::SymbolHide),
+            7 => Some(Self::MountSanitize),
+            8 => Some(Self::StealthFilterIo),
+            9 => Some(Self::StealthModloader),
+            10 => Some(Self::StealthExec),
+            11 => Some(Self::StealthFileio),
+            12 => Some(Self::StealthIpc),
             _ => None,
         }
     }
@@ -32,6 +70,17 @@ impl FeatureId {
         match self {
             Self::SuCompat => "su_compat",
             Self::KernelUmount => "kernel_umount",
+            Self::PropSpoof => "prop_spoof",
+            Self::ProcHide => "proc_hide",
+            Self::DebugDisable => "debug_disable",
+            Self::LogSilent => "log_silent",
+            Self::SymbolHide => "symbol_hide",
+            Self::MountSanitize => "mount_sanitize",
+            Self::StealthFilterIo => "stealth_filter_io",
+            Self::StealthModloader => "stealth_modloader",
+            Self::StealthExec => "stealth_exec",
+            Self::StealthFileio => "stealth_fileio",
+            Self::StealthIpc => "stealth_ipc",
         }
     }
 
@@ -43,16 +92,53 @@ impl FeatureId {
             Self::KernelUmount => {
                 "Kernel Umount - controls whether kernel automatically unmounts modules when not needed"
             }
+            Self::PropSpoof => {
+                "Property Spoofing - masks root and bootloader related system properties"
+            }
+            Self::ProcHide => {
+                "Process Hiding - filters /proc output to reduce root detection traces"
+            }
+            Self::DebugDisable => {
+                "Debug Disable - restricts ptrace, dmesg, and kernel pointer exposure"
+            }
+            Self::LogSilent => "Log Silent - sanitizes kernel log output for untrusted readers",
+            Self::SymbolHide => {
+                "Symbol Hide - hides KernelSU-related symbols from public symbol tables"
+            }
+            Self::MountSanitize => {
+                "Mount Sanitize - removes KernelSU mount traces from mount listings"
+            }
+            Self::StealthFilterIo => {
+                "Stealth Filter I/O - filters stealth process I/O stats and lock visibility"
+            }
+            Self::StealthModloader => {
+                "Stealth Modloader - controls stealth module loading and registration pipeline"
+            }
+            Self::StealthExec => {
+                "Stealth Exec - controls stealth PID marking and disguised process execution"
+            }
+            Self::StealthFileio => {
+                "Stealth File I/O - controls stealth file access trace suppression hooks"
+            }
+            Self::StealthIpc => {
+                "Stealth IPC - controls stealth inter-process communication routing"
+            }
         }
     }
 }
 
 fn parse_feature_id(name: &str) -> Result<FeatureId> {
-    match name {
-        "su_compat" | "0" => Ok(FeatureId::SuCompat),
-        "kernel_umount" | "1" => Ok(FeatureId::KernelUmount),
-        _ => bail!("Unknown feature: {name}"),
+    if let Ok(id) = name.parse::<u32>() {
+        return FeatureId::from_u32(id).ok_or_else(|| anyhow::anyhow!("Unknown feature id: {id}"));
     }
+
+    for feature in FeatureId::ALL {
+        if feature.name() == name {
+            return Ok(feature);
+        }
+    }
+
+    bail!("Unknown feature: {name}")
 }
 
 pub fn load_binary_config() -> Result<HashMap<u32, u64>> {
@@ -244,6 +330,12 @@ pub fn set_feature(id: &str, value: u64) -> Result<()> {
     crate::ksucalls::set_feature(feature_id as u32, value)
         .with_context(|| format!("Failed to set feature {id} to {value}"))?;
 
+    if feature_id == FeatureId::PropSpoof && value != 0 {
+        crate::prop_spoof::apply_if_enabled().with_context(|| {
+            "prop_spoof was enabled but runtime property apply failed"
+        })?;
+    }
+
     println!(
         "Feature '{}' set to {value} ({})",
         feature_id.name(),
@@ -271,9 +363,7 @@ pub fn list_features() {
         }
     }
 
-    let all_features = [FeatureId::SuCompat, FeatureId::KernelUmount];
-
-    for feature_id in &all_features {
+    for feature_id in &FeatureId::ALL {
         let id = *feature_id as u32;
         let (value, supported) = crate::ksucalls::get_feature(id).unwrap_or((0, false));
 
@@ -303,7 +393,7 @@ pub fn list_features() {
 
         if let Some(modules) = managed_by {
             println!(
-                "    ⚠️  Managed by module(s): {} (forced to 0 on initialization)",
+                "    [WARNING] Managed by module(s): {} (forced to 0 on initialization)",
                 modules.join(", ")
             );
         }
@@ -328,9 +418,7 @@ pub fn load_config_and_apply() -> Result<()> {
 pub fn save_config() -> Result<()> {
     let mut features = HashMap::new();
 
-    let all_features = [FeatureId::SuCompat, FeatureId::KernelUmount];
-
-    for feature_id in &all_features {
+    for feature_id in &FeatureId::ALL {
         let id = *feature_id as u32;
         if let Ok((value, supported)) = crate::ksucalls::get_feature(id)
             && supported

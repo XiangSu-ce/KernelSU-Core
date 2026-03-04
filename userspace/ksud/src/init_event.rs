@@ -99,6 +99,11 @@ pub fn on_post_data_fs() -> Result<()> {
         warn!("load system.prop failed: {e}");
     }
 
+    // apply built-in property spoof rules (gated by feature `prop_spoof`)
+    if let Err(e) = crate::prop_spoof::apply_if_enabled() {
+        warn!("apply prop_spoof rules failed: {e}");
+    }
+
     // execute metamodule mount script
     if let Err(e) = metamodule::exec_mount_script(module_dir) {
         warn!("execute metamodule mount failed: {e}");

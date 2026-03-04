@@ -102,12 +102,23 @@ jobs:
           name: ksud-x86_64-linux-android
           path: .
 
-      - name: Copy ksud to app jniLibs
+      - name: Download ksuinit
+        uses: actions/download-artifact@v7
+        with:
+          name: ksuinit
+          path: .
+
+      - name: Copy ksud and ksuinit to app jniLibs
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a
           mkdir -p app/src/main/jniLibs/x86_64
           cp -f ../aarch64-linux-android/release/ksud ../manager/app/src/main/jniLibs/arm64-v8a/libksud.so
           cp -f ../x86_64-linux-android/release/ksud ../manager/app/src/main/jniLibs/x86_64/libksud.so
+          # Ship ksuinit as a native lib so Manager can pass it to ksud via --init
+          KSUINIT_BIN=$(find . -path '*/release/ksuinit' -type f | head -1)
+          if [ -n "$KSUINIT_BIN" ]; then
+            cp -f "$KSUINIT_BIN" ../manager/app/src/main/jniLibs/arm64-v8a/libksuinit.so
+          fi
 
       - name: Build with Gradle
         run: ./gradlew clean assembleRelease

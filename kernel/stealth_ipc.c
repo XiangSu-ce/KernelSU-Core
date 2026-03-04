@@ -28,6 +28,7 @@
 
 #include "klog.h" // IWYU pragma: keep
 #include "stealth.h"
+#include "feature.h"
 
 /* ---- IPC Handler Registry ---- */
 
@@ -59,6 +60,12 @@ static struct stealth_ipc_handler ipc_handlers[MAX_IPC_HANDLERS];
 static atomic_t ipc_inflight[MAX_IPC_HANDLERS];
 static DEFINE_SPINLOCK(ipc_lock);
 static DECLARE_WAIT_QUEUE_HEAD(ipc_waitq);
+static atomic_t stealth_ipc_enabled = ATOMIC_INIT(1);
+
+static bool stealth_ipc_is_enabled(void)
+{
+	return atomic_read(&stealth_ipc_enabled) != 0;
+}
 
 /**
  * ksu_stealth_ipc_register() - Register an IPC handler for a stealth module.
@@ -74,6 +81,8 @@ int ksu_stealth_ipc_register(const char *module_id,
 	unsigned long flags;
 	int i, slot = -1;
 
+	if (!stealth_ipc_is_enabled())
+		return -EOPNOTSUPP;
 	if (!module_id || !handler)
 		return -EINVAL;
 	if (!*module_id)
@@ -118,6 +127,8 @@ int ksu_stealth_ipc_unregister(const char *module_id)
 	unsigned long flags;
 	int i;
 
+	if (!stealth_ipc_is_enabled())
+		return 0;
 	if (!module_id)
 		return -EINVAL;
 	if (!*module_id)
@@ -160,6 +171,9 @@ static int stealth_ipc_dispatch(const char *module_id, u32 subcmd,
 	stealth_ipc_handler_fn handler = NULL;
 	void *priv = NULL;
 	int i, slot = -1;
+
+	if (!stealth_ipc_is_enabled())
+		return -EOPNOTSUPP;
 
 	spin_lock_irqsave(&ipc_lock, flags);
 	for (i = 0; i < MAX_IPC_HANDLERS; i++) {
@@ -215,6 +229,8 @@ int ksu_do_stealth_ipc(void __user *arg)
 {
 	struct ksu_stealth_ipc_cmd cmd;
 
+	if (!stealth_ipc_is_enabled())
+		return -EOPNOTSUPP;
 	if (!arg)
 		return -EINVAL;
 	if (copy_from_user(&cmd, arg, sizeof(cmd)))
@@ -299,7 +315,8 @@ int ksu_do_stealth_register_mod(void __user *arg)
  */
 int ksu_do_stealth_exec(void __user *arg)
 {
-	return ksu_stealth_mark_self();
+	(void)arg;
+	return ksu_stealth_exec(NULL, NULL, NULL);
 }
 
 /* ---- /dev Device Node Hiding ---- */
@@ -326,6 +343,8 @@ int ksu_stealth_hide_dev(const char *name)
 	unsigned long flags;
 	int i;
 
+	if (!stealth_ipc_is_enabled())
+		return -EOPNOTSUPP;
 	if (!name || !*name)
 		return -EINVAL;
 	if (strnlen(name, MAX_DEV_NAME_LEN) >= MAX_DEV_NAME_LEN)
@@ -361,6 +380,8 @@ int ksu_stealth_unhide_dev(const char *name)
 	unsigned long flags;
 	int i;
 
+	if (!stealth_ipc_is_enabled())
+		return 0;
 	if (!name)
 		return -EINVAL;
 	if (!*name)
@@ -396,6 +417,8 @@ bool ksu_is_hidden_dev(const char *name)
 	unsigned long flags;
 	int i;
 
+	if (!stealth_ipc_is_enabled())
+		return false;
 	if (!name || !*name)
 		return false;
 
@@ -422,6 +445,8 @@ ssize_t ksu_filter_proc_devices(char __user *ubuf, ssize_t count)
 	char *kbuf, *src, *dst, *line_end;
 	ssize_t new_len = 0;
 
+	if (!stealth_ipc_is_enabled())
+		return count;
 	if (!ksu_should_hide_proc_general())
 		return count;
 	if (count <= 0 || hidden_dev_count == 0)
@@ -487,20 +512,7 @@ ssize_t ksu_filter_proc_devices(char __user *ubuf, ssize_t count)
 	return new_len;
 }
 
-/* ---- Init/Exit ---- */
-
-void ksu_stealth_ipc_init(void)
-{
-	int i;
-
-	memset(ipc_handlers, 0, sizeof(ipc_handlers));
-	for (i = 0; i < MAX_IPC_HANDLERS; i++)
-		atomic_set(&ipc_inflight[i], 0);
-	memset(hidden_devs, 0, sizeof(hidden_devs));
-	hidden_dev_count = 0;
-}
-
-void ksu_stealth_ipc_exit(void)
+static void clear_stealth_ipc_state(void)
 {
 	unsigned long flags;
 	int i;
@@ -531,6 +543,55 @@ void ksu_stealth_ipc_exit(void)
 	spin_unlock_irqrestore(&ipc_lock, flags);
 
 	spin_lock_irqsave(&hidden_dev_lock, flags);
+	memset(hidden_devs, 0, sizeof(hidden_devs));
 	hidden_dev_count = 0;
 	spin_unlock_irqrestore(&hidden_dev_lock, flags);
+}
+
+static int stealth_ipc_get(u64 *value)
+{
+	*value = (u64)stealth_ipc_is_enabled();
+	return 0;
+}
+
+static int stealth_ipc_set(u64 value)
+{
+	bool enable = value ? true : false;
+
+	atomic_set(&stealth_ipc_enabled, enable ? 1 : 0);
+	if (!enable)
+		clear_stealth_ipc_state();
+	pr_info("stealth_ipc: %s\n", enable ? "enabled" : "disabled");
+	return 0;
+}
+
+static const struct ksu_feature_handler stealth_ipc_handler = {
+	.feature_id = KSU_FEATURE_STEALTH_IPC,
+	.name = "stealth_ipc",
+	.get_handler = stealth_ipc_get,
+	.set_handler = stealth_ipc_set,
+};
+
+/* ---- Init/Exit ---- */
+
+void ksu_stealth_ipc_init(void)
+{
+	int i;
+	int ret;
+
+	ret = ksu_register_feature_handler(&stealth_ipc_handler);
+	if (ret)
+		pr_err("stealth_ipc: feature register failed: %d\n", ret);
+
+	memset(ipc_handlers, 0, sizeof(ipc_handlers));
+	for (i = 0; i < MAX_IPC_HANDLERS; i++)
+		atomic_set(&ipc_inflight[i], 0);
+	memset(hidden_devs, 0, sizeof(hidden_devs));
+	hidden_dev_count = 0;
+}
+
+void ksu_stealth_ipc_exit(void)
+{
+	clear_stealth_ipc_state();
+	ksu_unregister_feature_handler(KSU_FEATURE_STEALTH_IPC);
 }

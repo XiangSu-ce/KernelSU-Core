@@ -35,6 +35,8 @@ mod module_config;
 #[cfg(target_os = "android")]
 mod profile;
 #[cfg(target_os = "android")]
+mod prop_spoof;
+#[cfg(target_os = "android")]
 mod restorecon;
 #[cfg(target_os = "android")]
 mod sepolicy;

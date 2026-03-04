@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.os.LocaleList
 import android.os.PowerManager
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -76,7 +77,7 @@ import dawang.KernelSU.Core.ui.component.rememberLoadingDialog
 import dawang.KernelSU.Core.ui.util.reboot
 import dawang.KernelSU.Core.ui.navigation3.Navigator
 import dawang.KernelSU.Core.ui.navigation3.Route
-import dawang.KernelSU.Core.ui.theme.RazerColors
+import dawang.KernelSU.Core.ui.theme.CoreColors
 import dawang.KernelSU.Core.ui.util.execKsud
 import dawang.KernelSU.Core.ui.util.getFeaturePersistValue
 import dawang.KernelSU.Core.ui.util.getFeatureStatus
@@ -168,7 +169,7 @@ fun SettingPager(
                                 Icons.Rounded.Update,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_check_update),
-                                tint = RazerColors.GreenDim
+                                tint = CoreColors.GreenDim
                             )
                         },
                         checked = checkUpdate,
@@ -195,7 +196,7 @@ fun SettingPager(
                                 Icons.Rounded.UploadFile,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_module_check_update),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid,
@@ -213,7 +214,7 @@ fun SettingPager(
                 Text(
                     text = stringResource(id = R.string.settings_section_appearance),
                     modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
-                    color = RazerColors.GreenDim,
+                    color = CoreColors.GreenDim,
                     fontSize = 12.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     letterSpacing = 1.5.sp
@@ -242,7 +243,7 @@ fun SettingPager(
                                 Icons.Rounded.Palette,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_theme),
-                                tint = RazerColors.GreenDim
+                                tint = CoreColors.GreenDim
                             )
                         },
                         selectedIndex = themeMode,
@@ -270,7 +271,7 @@ fun SettingPager(
                                 Icons.Rounded.Language,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_language),
-                                tint = RazerColors.GreenDim
+                                tint = CoreColors.GreenDim
                             )
                         },
                         selectedIndex = languageMode,
@@ -349,7 +350,7 @@ fun SettingPager(
                                     Icons.Rounded.Colorize,
                                     modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                     contentDescription = stringResource(id = R.string.settings_key_color),
-                                    tint = if (isMonetTheme) RazerColors.GreenDim else RazerColors.T40
+                                    tint = if (isMonetTheme) CoreColors.GreenDim else CoreColors.T40
                                 )
                             },
                             enabled = isMonetTheme,
@@ -373,7 +374,7 @@ fun SettingPager(
                                     Icons.Rounded.Adb,
                                     modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                     contentDescription = stringResource(id = R.string.settings_enable_predictive_back),
-                                    tint = RazerColors.GreenDim
+                                    tint = CoreColors.GreenDim
                                 )
                             },
                             checked = enablePredictiveBack,
@@ -396,7 +397,7 @@ fun SettingPager(
                                 Icons.Rounded.AspectRatio,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_page_scale),
-                                tint = RazerColors.GreenDim
+                                tint = CoreColors.GreenDim
                             )
                         },
                         endActions = {
@@ -438,7 +439,7 @@ fun SettingPager(
                 Text(
                     text = stringResource(id = R.string.settings_section_kernel_features),
                     modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
-                    color = RazerColors.GreenDim,
+                    color = CoreColors.GreenDim,
                     fontSize = 12.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     letterSpacing = 1.5.sp
@@ -481,7 +482,7 @@ fun SettingPager(
                                 Icons.Rounded.RemoveModerator,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_sucompat),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid && suStatus == "supported",
@@ -489,21 +490,40 @@ fun SettingPager(
                         onSelectedIndexChange = { index ->
                             when (index) {
                                 0 -> if (Natives.setSuEnabled(true)) {
-                                    execKsud("feature save", true)
                                     prefs.edit { putInt("su_compat_mode", 0) }
                                     suCompatMode = 0
+                                    if (!execKsud("feature save", true)) {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.operation_failed),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
                                 1 -> if (Natives.setSuEnabled(true)) {
-                                    execKsud("feature save", true)
+                                    val saveOk = execKsud("feature save", true)
                                     if (Natives.setSuEnabled(false)) {
                                         prefs.edit { putInt("su_compat_mode", 0) }
                                         suCompatMode = 1
+                                        if (!saveOk) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.operation_failed),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
                                     }
                                 }
                                 2 -> if (Natives.setSuEnabled(false)) {
-                                    execKsud("feature save", true)
                                     prefs.edit { putInt("su_compat_mode", 2) }
                                     suCompatMode = 2
+                                    if (!execKsud("feature save", true)) {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.operation_failed),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
                             }
                         }
@@ -527,15 +547,21 @@ fun SettingPager(
                                 Icons.Rounded.RemoveCircle,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_kernel_umount),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid && umountStatus == "supported",
                         checked = isKernelUmountEnabled,
                         onCheckedChange = { checked ->
                             if (Natives.setKernelUmountEnabled(checked)) {
-                                execKsud("feature save", true)
                                 isKernelUmountEnabled = checked
+                                if (!execKsud("feature save", true)) {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.operation_failed),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
                         }
                     )
@@ -550,7 +576,7 @@ fun SettingPager(
                                 Icons.Rounded.FolderDelete,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_umount_modules_default),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid,
@@ -577,9 +603,9 @@ fun SettingPager(
                                 Icons.Rounded.Security,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.safe_mode),
-                                tint = if (isKsuValid && isSafeMode) RazerColors.Danger
-                                       else if (isKsuValid) RazerColors.GreenDim
-                                       else RazerColors.T40
+                                tint = if (isKsuValid && isSafeMode) CoreColors.Danger
+                                       else if (isKsuValid) CoreColors.GreenDim
+                                       else CoreColors.T40
                             )
                         },
                         enabled = false,
@@ -591,7 +617,7 @@ fun SettingPager(
                 Text(
                     text = stringResource(id = R.string.settings_section_advanced),
                     modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
-                    color = RazerColors.GreenDim,
+                    color = CoreColors.GreenDim,
                     fontSize = 12.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     letterSpacing = 1.5.sp
@@ -610,7 +636,7 @@ fun SettingPager(
                                 Icons.Rounded.Fence,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = profileTemplate,
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid,
@@ -626,7 +652,7 @@ fun SettingPager(
                                 Icons.Rounded.BugReport,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.send_log),
-                                tint = RazerColors.GreenDim
+                                tint = CoreColors.GreenDim
                             )
                         },
                         onClick = {
@@ -647,7 +673,7 @@ fun SettingPager(
                                 Icons.Rounded.DeveloperMode,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.enable_web_debugging),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid,
@@ -668,7 +694,7 @@ fun SettingPager(
                                 Icons.Rounded.Extension,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_module_repo),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid,
@@ -702,7 +728,7 @@ fun SettingPager(
                                 Icons.Rounded.PowerSettingsNew,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = stringResource(id = R.string.settings_reboot_device),
-                                tint = if (isKsuValid) RazerColors.GreenDim else RazerColors.T40
+                                tint = if (isKsuValid) CoreColors.GreenDim else CoreColors.T40
                             )
                         },
                         enabled = isKsuValid,
@@ -729,7 +755,7 @@ fun SettingPager(
                                 Icons.Rounded.Delete,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = uninstall,
-                                tint = if (isKsuValid && lkmMode) RazerColors.Danger else RazerColors.T40,
+                                tint = if (isKsuValid && lkmMode) CoreColors.Danger else CoreColors.T40,
                             )
                         },
                         enabled = isKsuValid && lkmMode,
@@ -753,7 +779,7 @@ fun SettingPager(
                                 Icons.Rounded.ContactPage,
                                 modifier = Modifier.padding(end = 16.dp).size(20.dp),
                                 contentDescription = about,
-                                tint = RazerColors.GreenDim
+                                tint = CoreColors.GreenDim
                             )
                         },
                         onClick = {
