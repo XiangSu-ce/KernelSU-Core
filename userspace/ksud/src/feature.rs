@@ -331,9 +331,8 @@ pub fn set_feature(id: &str, value: u64) -> Result<()> {
         .with_context(|| format!("Failed to set feature {id} to {value}"))?;
 
     if feature_id == FeatureId::PropSpoof && value != 0 {
-        crate::prop_spoof::apply_if_enabled().with_context(|| {
-            "prop_spoof was enabled but runtime property apply failed"
-        })?;
+        crate::prop_spoof::apply_if_enabled()
+            .with_context(|| "prop_spoof was enabled but runtime property apply failed")?;
     }
 
     println!(
