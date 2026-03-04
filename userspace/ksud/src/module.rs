@@ -675,7 +675,7 @@ fn mark_all_modules(flag_file: &str) -> Result<()> {
         .flatten()
         .map(|entry| entry.path())
         .collect();
-    entries.sort_by_key(|a| a.file_name());
+    entries.sort_by_key(|a| a.file_name().map(std::ffi::OsStr::to_os_string));
     for path in entries {
         if !path.is_dir() {
             continue;
