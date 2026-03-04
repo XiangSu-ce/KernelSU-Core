@@ -79,7 +79,7 @@ mod android {
             .flatten()
             .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "ko"))
             .collect();
-        candidates.sort_by_key(|a| a.file_name());
+        candidates.sort_by_key(std::fs::DirEntry::file_name);
         let modfile = candidates
             .into_iter()
             .map(|entry| entry.path())

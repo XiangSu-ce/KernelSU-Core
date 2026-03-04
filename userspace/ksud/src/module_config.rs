@@ -390,7 +390,7 @@ pub fn get_all_module_configs() -> Result<HashMap<String, HashMap<String, String
         .with_context(|| format!("Failed to read config directory: {}", config_root.display()))?
         .flatten()
         .collect();
-    entries.sort_by_key(|a| a.file_name());
+    entries.sort_by_key(std::fs::DirEntry::file_name);
 
     for entry in entries {
         let path = entry.path();
@@ -432,7 +432,7 @@ pub fn clear_all_temp_configs() -> Result<()> {
         .with_context(|| format!("Failed to read config directory: {}", config_root.display()))?
         .flatten()
         .collect();
-    entries.sort_by_key(|a| a.file_name());
+    entries.sort_by_key(std::fs::DirEntry::file_name);
 
     for entry in entries {
         let path = entry.path();

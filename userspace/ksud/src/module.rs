@@ -777,7 +777,7 @@ fn list_module(path: &str) -> Vec<HashMap<String, String>> {
     };
 
     let mut entries: Vec<_> = dir.flatten().collect();
-    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries.sort_by_key(std::fs::DirEntry::file_name);
 
     let mut modules: Vec<HashMap<String, String>> = Vec::new();
 
