@@ -3,7 +3,7 @@ use anyhow::Result;
 use jwalk::{Parallelism::Serial, WalkDir};
 use std::path::Path;
 
-use anyhow::{Context, Ok};
+use anyhow::Context;
 use extattr::{Flags as XattrFlags, lsetxattr};
 
 pub const SYSTEM_CON: &str = "u:object_r:system_file:s0";

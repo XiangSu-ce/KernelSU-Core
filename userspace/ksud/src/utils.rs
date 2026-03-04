@@ -1,4 +1,4 @@
-use anyhow::{Context, Error, Ok, Result, bail};
+use anyhow::{Context, Error, Result, bail};
 use std::{
     fs::{File, OpenOptions, create_dir_all, remove_file, write},
     io::{
