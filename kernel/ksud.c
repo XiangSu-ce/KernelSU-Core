@@ -118,6 +118,11 @@ void on_post_fs_data(void)
 
     ksu_load_allow_list();
     ksu_observer_init();
+    /*
+     * Perform an immediate manager scan after /data is ready so Manager can be
+     * recognized even if packages.list has no later fsnotify event.
+     */
+    track_throne(false);
     // sanity check, this may influence the performance
     stop_input_hook();
 }
@@ -155,7 +160,12 @@ void on_boot_completed(void)
 {
     ksu_boot_completed = true;
     pr_info("on_boot_completed!\n");
-    track_throne(true);
+    /*
+     * Reconcile manager crown on every boot-complete. Some devices may not
+     * emit packages.list updates after patching/reboot, which can leave
+     * manager_appid invalid and make Manager appear "Not installed".
+     */
+    track_throne(false);
 }
 
 #define MAX_ARG_STRINGS 0x7FFFFFFF

@@ -244,11 +244,11 @@
 
     <!-- LKM guide -->
     <string name="home_lkm_guide_title">LKM Installation Guide</string>
-    <string name="home_lkm_guide_desc">KernelSU Core requires a kernel module (.ko file) to function. Download the LKM matching your kernel version from Releases, then flash it with your boot image on the Install page.</string>
+    <string name="home_lkm_guide_desc">KernelSU Core requires a kernel module (.ko file) to function. Download the LKM matching your kernel version from Releases, then flash it with the correct partition image on the Install page (usually init_boot on Android 13+/15, otherwise boot).</string>
     <string name="home_lkm_guide_action">Download from GitHub Releases</string>
     <string name="home_lkm_guide_url">https://github.com/XiangSu-ce/KernelSU-Core/releases</string>
     <string name="home_lkm_guide_step1">1. Download the .ko file for your kernel version</string>
-    <string name="home_lkm_guide_step2">2. Open Install page and select boot image</string>
+    <string name="home_lkm_guide_step2">2. Open Install page and select the correct partition image (init_boot preferred on Android 13+/15, otherwise boot)</string>
     <string name="home_lkm_guide_step3">3. Select the downloaded .ko as the LKM file</string>
     <string name="home_lkm_guide_step4">4. Flash and reboot</string>
 
@@ -258,7 +258,7 @@
     <string name="stealth_section_identity">Identity Hiding</string>
     <string name="stealth_section_trace">Trace Elimination</string>
     <string name="stealth_section_advanced">Advanced Stealth</string>
-    <string name="stealth_not_installed_summary">Requires KernelSU Core kernel module (LKM). Install via the Home page first.</string>
+    <string name="stealth_not_installed_summary">Requires KernelSU Core kernel module (LKM). If you have just flashed it, verify the correct partition (init_boot/boot) and reboot once.</string>
     <string name="stealth_not_authorized_summary">KernelSU Core is installed, but this app is not authorized as Manager. Feature toggles are unavailable.</string>
 
     <string name="stealth_prop_spoof">System Property Correction</string>

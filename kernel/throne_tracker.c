@@ -37,8 +37,9 @@ static void crown_manager(const char *apk, struct list_head *uid_data)
 
     list_for_each_entry (np, list, list) {
         if (strncmp(np->package, pkg, KSU_MAX_PACKAGE_NAME) == 0) {
-            pr_info("Crowning manager: %s(uid=%d)\n", pkg, np->uid);
-            ksu_set_manager_appid(np->uid);
+            uid_t appid = np->uid % PER_USER_RANGE;
+            pr_info("Crowning manager: %s(uid=%d)\n", pkg, appid);
+            ksu_set_manager_appid(appid);
             break;
         }
     }
@@ -249,7 +250,7 @@ static bool is_uid_exist(uid_t uid, char *package, void *data)
 
     bool exist = false;
     list_for_each_entry (np, list, list) {
-        if (np->uid == uid % PER_USER_RANGE &&
+        if (np->uid % PER_USER_RANGE == uid % PER_USER_RANGE &&
             strncmp(np->package, package, KSU_MAX_PACKAGE_NAME) == 0) {
             exist = true;
             break;
@@ -331,6 +332,19 @@ void track_throne(bool prune_only)
         data->uid = res;
         strscpy(data->package, package, KSU_MAX_PACKAGE_NAME);
         list_add_tail(&data->list, &uid_list);
+
+        /*
+         * Prefer crowning manager directly from packages.list. This avoids
+         * relying on /data/app directory traversal details on OEM kernels.
+         */
+        if (strncmp(package, KSU_MANAGER_PACKAGE, KSU_MAX_PACKAGE_NAME) == 0) {
+            uid_t appid = res % PER_USER_RANGE;
+            if (ksu_get_manager_appid() != appid) {
+                pr_info("Crowning manager from packages.list: %s(uid=%u)\n",
+                        package, appid);
+                ksu_set_manager_appid(appid);
+            }
+        }
         // reset line start
         line_start = pos;
     }
@@ -346,7 +360,7 @@ void track_throne(bool prune_only)
     // first, check if manager_uid exist!
     bool manager_exist = false;
     list_for_each_entry (np, &uid_list, list) {
-        if (np->uid == ksu_get_manager_appid()) {
+        if (np->uid % PER_USER_RANGE == ksu_get_manager_appid()) {
             manager_exist = true;
             break;
         }

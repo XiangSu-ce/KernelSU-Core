@@ -11,32 +11,6 @@ val androidBuildToolsVersion by extra("36.1.0")
 val androidCompileNdkVersion by extra(libs.versions.ndk.get())
 val androidSourceCompatibility by extra(JavaVersion.VERSION_21)
 val androidTargetCompatibility by extra(JavaVersion.VERSION_21)
-val managerVersionCode by extra(getVersionCode())
-val managerVersionName by extra(getVersionName())
+val managerVersionCode by extra(3007)
+val managerVersionName by extra("1.0.3")
 
-fun getGitCommitCount(): Int {
-    val pb = ProcessBuilder("git", "rev-list", "--count", "HEAD")
-        .directory(rootProject.projectDir)
-        .redirectErrorStream(true)
-    val process = pb.start()
-    val output = process.inputStream.bufferedReader().use { it.readText().trim() }
-    return output.toIntOrNull() ?: 1
-}
-
-fun getGitDescribe(): String {
-    val pb = ProcessBuilder("git", "describe", "--tags", "--always")
-        .directory(rootProject.projectDir)
-        .redirectErrorStream(true)
-    val process = pb.start()
-    val output = process.inputStream.bufferedReader().use { it.readText().trim() }
-    return output.ifEmpty { "dev" }
-}
-
-fun getVersionCode(): Int {
-    val commitCount = getGitCommitCount()
-    return 30000 + commitCount
-}
-
-fun getVersionName(): String {
-    return getGitDescribe()
-}

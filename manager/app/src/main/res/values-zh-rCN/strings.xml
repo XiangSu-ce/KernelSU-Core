@@ -242,10 +242,10 @@
 
     <!-- LKM 安装指引 -->
     <string name="home_lkm_guide_title">LKM 安装指引</string>
-    <string name="home_lkm_guide_desc">KernelSU Core 需要配合内核模块（.ko 文件）使用。请从 Releases 下载与内核版本匹配的 LKM 文件，在安装页面与 boot 镜像一起刷入。</string>
+    <string name="home_lkm_guide_desc">KernelSU Core 需要配合内核模块（.ko 文件）使用。请从 Releases 下载与内核版本匹配的 LKM 文件，并在安装页面选择正确分区镜像刷入（Android 13+/15 通常选 init_boot，其它机型按提示选 boot）。</string>
     <string name="home_lkm_guide_action">前往 GitHub Releases 下载</string>
     <string name="home_lkm_guide_step1">1. 下载与内核版本匹配的 .ko 文件</string>
-    <string name="home_lkm_guide_step2">2. 打开安装页面，选择 boot 镜像</string>
+    <string name="home_lkm_guide_step2">2. 打开安装页面，选择正确分区镜像（Android 13+/15 优先 init_boot，其它机型通常为 boot）</string>
     <string name="home_lkm_guide_step3">3. 选择下载的 .ko 作为 LKM 文件</string>
     <string name="home_lkm_guide_step4">4. 刷入并重启设备</string>
 
@@ -255,7 +255,7 @@
     <string name="stealth_section_identity">身份隐藏</string>
     <string name="stealth_section_trace">痕迹消除</string>
     <string name="stealth_section_advanced">高级隐匿</string>
-    <string name="stealth_not_installed_summary">需要安装 KernelSU Core 内核模块（LKM）才能使用，请先在主页完成安装。</string>
+    <string name="stealth_not_installed_summary">需要安装 KernelSU Core 内核模块（LKM）才能使用。若刚刷入仍显示未安装，请确认分区选择为 init_boot/boot 且已重启一次。</string>
     <string name="stealth_not_authorized_summary">KernelSU Core 已安装，但当前应用未获得管理器授权，无法切换该功能。</string>
 
     <string name="stealth_prop_spoof">系统属性校正</string>
